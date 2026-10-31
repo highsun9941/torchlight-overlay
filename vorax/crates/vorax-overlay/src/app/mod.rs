@@ -2,6 +2,7 @@
 //! (the log, the pictures, the reading and the advice).
 
 mod capture;
+mod diagnostics;
 mod menu;
 mod logview;
 pub(crate) mod ocr;

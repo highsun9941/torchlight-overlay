@@ -184,7 +184,9 @@ pub fn note(msg: &str) {
     use std::io::Write;
     let path = data_dir().join("overlay.log");
     if std::fs::metadata(&path).is_ok_and(|m| m.len() > 2_000_000) {
-        let _ = std::fs::rename(&path, data_dir().join("overlay.log.old"));
+        let old=data_dir().join("overlay.log.old");
+        let _=std::fs::remove_file(&old);
+        let _ = std::fs::rename(&path, old);
     }
     let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0);
     let line = format!("{secs:.3} {msg}\n");
@@ -222,4 +224,18 @@ impl Settings {
     pub fn save(&self) {
         let _ = std::fs::write(data_dir().join("settings.json"), serde_json::to_string_pretty(self).unwrap());
     }
+}
+
+/// Mouse position only; this helper never generates input.
+pub fn hovered_card(hwnd:Hwnd, ui:f64, size:usize)->Option<usize> {
+    if unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() } != hwnd.get() { return None; }
+    let (cx,cy,w,h)=client_rect(hwnd)?;
+    let mut point=windows::Win32::Foundation::POINT::default();
+    unsafe {windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).ok()?;}
+    let (x,y)=((point.x-cx) as f64,(point.y-cy) as f64);
+    let l=vorax_scan::layout::layout_at(w as usize,h as usize,ui);
+    l.hand_at(size).iter().enumerate().filter_map(|(i,c)| {
+        let (dx,dy)=(x-c.cx,y-c.cy);
+        (dx.abs()<115.0*l.k && dy.abs()<190.0*l.k).then_some((i,dx.abs()))
+    }).min_by(|a,b|a.1.total_cmp(&b.1)).map(|p|p.0)
 }

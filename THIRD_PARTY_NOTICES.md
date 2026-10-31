@@ -20,3 +20,5 @@ Modifications in this distribution: Korean UI and OCR aliases; portable configur
 Additional modifications in 1.1.0: bounded numeric-region recovery with product validation; translated-card art fallback; one supplemental Korean round-number glyph; zero-reroll instrument-screen handling; maximum CPU/OCR mode; production-path diagnostics and detailed unresolved-input logs. No new runtime package dependency is introduced.
 
 Additional modifications in 1.1.1: log-independent visual change detection, stale-advice invalidation, isolated Korean title OCR and validated round-counter OCR fallback, and supplemental samples from a reported round-6 frame. No runtime dependency added.
+
+Additional modifications in 1.2.0: user-assisted enlarged-card OCR, blue unresolved-slot markers, persistent capture sessions, shape-based UI change detection, and bounded local diagnostic captures. No runtime package dependency added.

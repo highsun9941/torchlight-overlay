@@ -2,6 +2,7 @@
 //! a stable screen is read once, even when the game stops writing board events.
 
 use super::capture::Capturer;
+use super::diagnostics;
 use super::ocr::Ocr;
 use super::sys::{find_game_window, find_log, note};
 use super::window::{GameLog, ToUi, ToWorker, Waker};
@@ -72,6 +73,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
     let mut pipe = Pipeline::new(opts.shelley);
     let mut watch = ScreenWatch::default();
     let mut last_visual_poll = Instant::now() - VISUAL_POLL;
+    let mut last_heartbeat=Instant::now();
     let mut follower: Option<Follower> = None;
     let mut looked_for_log = Instant::now() - Duration::from_secs(60);
     let mut settler = Settler::default();
@@ -146,6 +148,10 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         }
         if last_log_check.elapsed() >= Duration::from_secs(1) {
             last_log_check = Instant::now();
+            if last_heartbeat.elapsed()>=Duration::from_secs(10) {
+                diagnostics::event(0,"watch_heartbeat",serde_json::json!({"capture":capturer.state(),"pendingSlots":pipe.requested_slots(),"lastChange":watch.last_difference,"retries":retries}));
+                last_heartbeat=Instant::now();
+            }
             game_open_since = if find_game_window().is_some() { game_open_since.or(Some(Instant::now())) } else { None };
             let state = match (&follower, game_open_since) {
                 (None, _) => GameLog::Missing,
@@ -174,8 +180,48 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             last_visual_poll = Instant::now();
             if let Some(game) = find_game_window() {
                 match capturer.grab(game) {
-                    Ok(Some(frame)) => match watch.observe(&frame, pipe.ui(), now_ms()) {
+                    Ok(Some(frame)) => {
+                        let size=pipe.pending().and_then(|r|r.hand_ranks.as_ref()).map_or(3,|h|h.len().max(3));
+                        let hovered=super::sys::hovered_card(game,pipe.ui(),size);
+                        watch.set_hover(hovered);
+                        let mut inspecting=false;
+                        if let (Some(slot),Some(engine))=(hovered,ocr.as_ref()) {
+                            if pipe.requested_slots().contains(&slot) {
+                                inspecting=true;
+                                if let Some(pending)=pipe.pending() {
+                                    let phase=match pending.state.phase {vorax::advisor::ScreenPhase::Potion=>"potion",vorax::advisor::ScreenPhase::Instrument=>"instrument",_=>"protocol"};
+                                    let ranks=pending.hand_ranks.as_ref().and_then(|r|r.get(slot)).cloned().unwrap_or_default();
+                                    let hover_id=diagnostics::next_scan();
+                                    let mut hover_texts=Vec::new();let mut hover_crops=Vec::new();
+                                    let mut text=|crop:&vorax_scan::Img| {
+                                        let result=engine.read(crop);
+                                        let text=result.as_ref().ok().cloned().unwrap_or_default();
+                                        hover_texts.push(serde_json::json!({"size":[crop.width,crop.height],"text":text,"error":result.err().map(|e|e.to_string())}));
+                                        hover_crops.push(crop.clone());text
+                                    };
+                                    let result=vorax_scan::hover::recognize(&frame,phase,&ranks,&mut text);
+                                    drop(text);
+                                    diagnostics::event(hover_id,"hover_ocr",serde_json::json!({"slot":slot,"result":result,"sourceCandidates":ranks,"ocr":hover_texts}));
+                                    if result.is_err() {diagnostics::save(hover_id,"hover_unverified",&frame,None,pipe.pending(),&hover_texts,&hover_crops,serde_json::json!({"slot":slot,"result":result}));}
+                                    if let Ok(result)=result {
+                                        if pipe.confirm_hover(slot,&result,now_ms()) {
+                                            diagnostics::event(0,"hover_confirmed",serde_json::json!({"slot":slot,"name":result.name,"remaining":pipe.requested_slots()}));
+                                            status("확대 인식 완료","다음 파란 카드에 마우스를 올리거나, 카드 밖으로 옮겨 추천을 갱신하세요.","확대 결과 유지 중");
+                                            if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
+                                        }
+                                        else {status("확대 스캔 확인 중",&format!("{}번 카드에 마우스를 잠시 유지하세요.",slot+1),"같은 이름 두 번 확인");}
+                                    } else {status("확대 스캔 대기",&format!("파란 테두리의 {}번 카드에 마우스를 올려 확대 카드를 보여 주세요.",slot+1),"추천 보류");}
+                                }
+                            }
+                        } else {pipe.cancel_hover_candidate();}
+                        if pipe.hover_dirty() {
+                            if hovered.is_some() && vorax_scan::hover::tooltip(&frame).is_some() {inspecting=true;}
+                            else {visual=true;}
+                        }
+                        if inspecting && !visual {continue;}
+                        match watch.observe(&frame, pipe.ui(), now_ms()) {
                         Change::Changed => {
+                            diagnostics::event(0,"visual_change",serde_json::json!({"areas":watch.last_difference}));
                             pipe.invalidate();
                             retry = None;
                             relook_at = None;
@@ -184,6 +230,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         }
                         Change::Ready => visual = true,
                         _ => {}
+                        }
                     },
                     _ => {
                         pipe.invalidate();
@@ -193,6 +240,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                     }
                 }
             } else if watch.reset() {
+                capturer.stop();
+                pipe.reset_hover();
                 pipe.invalidate();
                 status("게임 창 연결 대기", "토치라이트를 실행하세요.", "창 없음");
                 send(ToUi::Clear);
@@ -214,7 +263,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             // while it reads and only change if what it finds does
             let quiet = relook && due.is_none() && !manual && again.is_none() && !visual;
             let retry_reason = read(&capturer, ocr.as_ref(), &mut pipe, &mut watch, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
-            if retry_reason == RetryReason::None || quiet {
+            if (retry_reason == RetryReason::Uncertain && !pipe.requested_slots().is_empty()) || retry_reason == RetryReason::None || quiet {
                 retries = 0;
             } else if retries < RETRIES {
                 retries += 1;
@@ -249,6 +298,8 @@ fn last_game_line_age(path: &Path) -> Option<Duration> {
 /// Takes a picture, reads it and advises; true when a card was in flight (nothing read).
 #[allow(clippy::too_many_arguments)]
 fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut ScreenWatch, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> RetryReason {
+    let scan_id=diagnostics::next_scan();
+    diagnostics::event(scan_id,"scan_start",serde_json::json!({"trigger":trigger,"manual":now,"quiet":quiet,"ocrMode":std::env::var("VORAX_OCR_MODE").ok(),"threads":std::env::var("RAYON_NUM_THREADS").ok()}));
     pipe.invalidate();
     let Some(game) = find_game_window() else {
         watch.reset();
@@ -281,19 +332,43 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
         }
     };
     let grabbed = t.elapsed().as_millis();
-    let mut read_text = |img: &vorax_scan::pixels::Img| ocr.and_then(|o| o.read(img).ok()).unwrap_or_default();
+    let mut ocr_attempts=Vec::new();
+    let mut crops=Vec::new();
+    let mut read_text=|img:&vorax_scan::pixels::Img| {
+        let result=ocr.map(|o|o.read(img));
+        let text=result.as_ref().and_then(|r|r.as_ref().ok()).cloned().unwrap_or_default();
+        ocr_attempts.push(serde_json::json!({"size":[img.width,img.height],"text":text,"error":result.and_then(Result::err).map(|e|e.to_string())}));
+        if crops.len()<4 {crops.push(img.clone());}
+        text
+    };
     let reader: crate::pipeline::TextReader = if ocr.is_some() { Some(&mut read_text) } else { None };
     let outcome = pipe.run(&frame, trigger, reader);
+    drop(read_text);
+    let kind=match &outcome {Outcome::Advice{..}=>"advice",Outcome::Uncertain{..}=>"uncertain",Outcome::Animating=>"animating",Outcome::NotGame=>"not_game",Outcome::Closing=>"closing"};
+    let reading=match &outcome {Outcome::Advice{reading,..}|Outcome::Uncertain{reading}=>Some(reading.as_ref()),_=>None};
+    diagnostics::event(scan_id,"recognition",serde_json::json!({"size":[frame.width,frame.height],"captureMs":grabbed,"outcome":kind,"ui":pipe.ui(),"blocking":reading.map(|r|r.blocking_fields()),"ocr":ocr_attempts}));
+    if kind=="uncertain" {diagnostics::save(scan_id,kind,&frame,None,reading,&ocr_attempts,&crops,serde_json::json!({"trigger":trigger}));}
     watch.accept(&frame, pipe.ui());
     if matches!(&outcome, Outcome::Advice { .. }) {
-        let still_current = capturer.grab(game).ok().flatten().is_some_and(|latest| !watch.differs(&latest, pipe.ui()));
-        if !still_current {
-            pipe.invalidate();
-            watch.reset();
-            status("화면 변경 감지", "분석 중 화면이 바뀌어 자동으로 다시 읽습니다.", "이전 추천 숨김");
-            send(ToUi::Clear);
-            note("screen changed during recognition: stale advice discarded");
-            return RetryReason::Animating;
+        let size=reading.and_then(|r|r.hand_ranks.as_ref()).map_or(3,|h|h.len().max(3));
+        watch.set_hover(super::sys::hovered_card(game,pipe.ui(),size));
+        match capturer.grab(game) {
+            Ok(Some(latest)) => {
+                let diff=watch.compare(&latest,pipe.ui());
+                if !diff.is_empty() {
+                    pipe.invalidate();
+                    diagnostics::event(scan_id,"freshness_rejected",serde_json::json!({"areas":diff,"recognized":reading.map(|r|&r.state),"before":[frame.width,frame.height],"after":[latest.width,latest.height]}));
+                    diagnostics::save(scan_id,"freshness_rejected",&frame,Some(&latest),reading,&ocr_attempts,&crops,serde_json::json!({"areas":diff}));
+                    status("화면 변경 감지","분석 중 카드나 수치가 바뀌어 다시 읽습니다.","이전 추천 숨김");send(ToUi::Clear);
+                    return RetryReason::Animating;
+                }
+            }
+            other => {
+                pipe.invalidate();watch.reset();
+                diagnostics::event(scan_id,"fresh_capture_failed",serde_json::json!({"error":other.err().map(|e|e.to_string())}));
+                status("캡처 연결 대기","게임 창을 복원하면 다시 인식합니다.","캡처 확인 실패");send(ToUi::Clear);
+                return RetryReason::Uncertain;
+            }
         }
     }
     if pipe.resumed {
@@ -335,10 +410,20 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
             let fields = reading.blocking_fields();
             note(&format!("{}: uncertain fields {}; reading {}", trigger.unwrap_or("manual"), fields.join(", "), serde_json::to_string(&reading).unwrap_or_default()));
             let detail = fields.iter().map(|field| field_label(field)).collect::<Vec<_>>().join(", ");
-            status("인식 확인 필요", &format!("확인할 항목: {detail}. 화면 변경 시 자동으로 다시 읽습니다. Ctrl+Alt+X로 재시도할 수 있습니다."), "추천 보류");
-            send(ToUi::Clear);
+            if let Some(plan)=pipe.hover_plan() {
+                let size=reading.frame.as_ref().map_or((frame.width,frame.height),|f|(f.width,f.height));
+                status("확대 스캔 요청",&format!("파란 카드에 마우스를 올려 주세요. 확인할 항목: {detail}"),"좌측 하단 확대 카드 인식 대기");
+                send(ToUi::Show(plan,size.0,size.1));
+            } else {
+                status("인식 확인 필요",&format!("확인할 항목: {detail}. Ctrl+Alt+X로 재시도할 수 있습니다."),"추천 보류");send(ToUi::Clear);
+            }
         }
         Outcome::Animating => {
+            if pipe.hover_dirty() {
+                status("확대 인식 완료","마우스를 카드 밖으로 옮기면 추천을 갱신합니다.","확대 결과 유지 중");
+                if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
+                return RetryReason::None;
+            }
             note(&format!("{}: picture {grabbed} ms, a card was flying off: looking again", trigger.unwrap_or("manual")));
         }
         Outcome::Closing => {
