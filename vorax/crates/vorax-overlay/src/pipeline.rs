@@ -275,6 +275,7 @@ impl Pipeline {
         }
         reading.state.shelley = Some(self.shelley);
         self.fill_rerolls(&mut reading);
+        self.apply_zoom(&mut reading);
         let read_ms = t.elapsed().as_secs_f64() * 1000.0;
         if !trustworthy(&reading) { return Outcome::Uncertain { reading: Box::new(reading) }; }
         let (advice, cached) = self.advise(&reading.state);
@@ -629,12 +630,21 @@ mod tests {
         assert_eq!(read.name,"Adherent Metatarsals");
         let candidates=vec![(0,vec![("Adherent Metatarsals".into(),0.99)])];
         assert_eq!(vorax_scan::hover::target(&read.name,&candidates,None),Some(0));
-        let mut pending=scan(&frame,scan_data(),true);
-        pending.fields.get_mut("hand0").unwrap().sure=false;
-        pending.problems.push(Problem::UnknownArt{field:"hand0".into(),crop:layout_at(frame.width,frame.height,1.0).card_face[0],hand:None,text:None});
-        let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut pending);
+        let mut pipe=Pipeline::new(0);
+        // Exercise the public production path. Calling apply_zoom directly would miss a wiring bug.
+        let mut failed_text=|_:&Img|"엉켜불은적골\n최소 2 그룹 해골\n경비병 보유 시,".to_string();
+        let first=pipe.run(&frame,None,Some(&mut failed_text));
+        assert!(matches!(first,Outcome::Uncertain{..}),"reported first title must request assistance");
+        assert!(pipe.requested_slots().contains(&0),"run must prepare the hover queue");
+        assert!(pipe.hover_plan().is_some(),"an unresolved card needs the blue guide");
         assert!(!pipe.confirm_hover(0,&read,500.0));assert!(pipe.confirm_hover(0,&read,1000.0));
-        assert!(pipe.requested_slots().is_empty());
+        assert!(!pipe.requested_slots().contains(&0));
+        let result=pipe.run(&reported("board-before.png"),None,Some(&mut failed_text));
+        match result {
+            Outcome::Advice{reading,..} => {assert_eq!(reading.state.hand[0],"Adherent Metatarsals");assert!(reading.fields["hand0"].sure);},
+            Outcome::Uncertain{reading} => panic!("completed hover must reach advice: {}",serde_json::to_string(&reading).unwrap()),
+            _ => panic!("completed hover must reach advice"),
+        }
     }
 
     #[cfg(windows)]

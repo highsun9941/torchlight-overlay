@@ -230,11 +230,11 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                             if hovered.is_some() && tip.is_some() {inspecting=true;}
                             else {visual=true;}
                         }
-                        if inspecting && !visual {continue;}
                         match watch.observe(&frame, pipe.ui(), now_ms()) {
                         Change::Changed => {
                             diagnostics::event(0,"visual_change",serde_json::json!({"areas":watch.last_difference}));
                             pipe.invalidate();
+                            pipe.reset_hover();
                             retry = None;
                             relook_at = None;
                             status("화면 변경 감지", "화면이 안정되면 자동으로 다시 읽습니다.", "이전 추천 숨김");
@@ -243,6 +243,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         Change::Ready => visual = true,
                         _ => {}
                         }
+                        if inspecting && !visual {continue;}
                     },
                     _ => {
                         pipe.invalidate();
