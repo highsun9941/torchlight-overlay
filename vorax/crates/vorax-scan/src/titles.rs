@@ -322,6 +322,24 @@ pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_tex
     read_titles_styled_known(img,reading,data,read_text,pictures_of,gold_first,&Default::default())
 }
 
+/// If a title loses its leading modifier, a short exact substring is not proof of the base variant.
+fn extended_names(data:&ScanData,phase:&str,name:&str)->Vec<String> {
+    let catalog=match phase {"instrument"=>&data.names.instrument,"protocol"=>&data.names.protocol,_=>&data.names.potion};
+    let clean=|s:&str|crate::korean::name(s).chars().filter(|c|crate::korean::hangul(*c)).collect::<Vec<_>>();
+    let base=clean(name);if base.len()<4 {return vec![];}
+    catalog.iter().filter(|n| {
+        let full=clean(n);full.len()>base.len() && full.windows(base.len()).any(|word|word==base.as_slice())
+    }).cloned().collect()
+}
+
+fn damaged_leading_modifier(name:&str,text:&str)->bool {
+    let base:Vec<_>=crate::korean::name(name).chars().filter(|c|crate::korean::hangul(*c)).collect();
+    if base.len()<2 {return false;}
+    let foreign=text.chars().take_while(|c|!crate::korean::hangul(*c)).any(|c|c.is_alphabetic());
+    let letters:Vec<_>=text.chars().filter(|c|crate::korean::hangul(*c)).collect();
+    foreign || letters.windows(2).position(|w|w==&base[..2]).is_some_and(|at|at>0)
+}
+
 /// Names already confirmed on this offer are supplied explicitly, without inventing OCR scores.
 pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, read_text: &mut dyn FnMut(&Img) -> String, pictures_of: Option<&dyn Fn(&str, usize, &[usize]) -> HashMap<usize, PictureRead>>, gold_first: bool, known: &std::collections::BTreeMap<usize,String>) -> Reading {
     let read = reading.hand_ranks.as_ref().map_or(0, |r| r.len());
@@ -378,7 +396,8 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
     let (phase, slots, _) = best.unwrap();
     let pos = l.hand_at(size);
 
-    let need: Vec<usize> = slots.iter().enumerate().filter(|(_, r)| !settled(r)).map(|(j, _)| j).collect();
+    let extensions:Vec<_>=slots.iter().enumerate().map(|(j,r)|if gold_first && !known.contains_key(&j) && settled(r) && damaged_leading_modifier(&r[0].0,&texts[j]) {extended_names(data,phase,&r[0].0)} else {vec![]}).collect();
+    let need: Vec<usize> = slots.iter().enumerate().filter(|(j, r)| !settled(r) || !extensions[*j].is_empty()).map(|(j, _)| j).collect();
     let from_reading = read == size && phase == header;
     let pics: HashMap<usize, PictureRead> = if from_reading {
         need.iter()
@@ -402,6 +421,14 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
         let key = format!("hand{j}");
         let pic = pics.get(&j);
         let mut name: Option<String> = None;
+        let prefix_missing=pic.is_some_and(|p| {
+            let base=p.ranks.iter().find(|(n,_)|n==&top.0).map_or(0.0,|(_,s)|*s);
+            p.ranks.iter().any(|(n,s)|extensions[j].contains(n) && *s>=ART_SUPPORT && *s>=base-0.04)
+        });
+        if prefix_missing {
+            fields.insert(key,FieldRead{sure:false,guess:Some(top.0.clone()),score:Some(top.1),second:second.map(|s|s.1)});
+            unknown.push(j);continue;
+        }
         if settled(r) {
             name = Some(top.0.clone());
             fields.insert(key, FieldRead { sure: true, guess: name.clone(), score: Some(top.1), second: second.map(|s| s.1) });

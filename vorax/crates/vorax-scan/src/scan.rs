@@ -178,6 +178,19 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
                 rf = Some(wider);
             }
         }
+        // A whole-frame colour correction can erase a perfectly legible counter. Validate this
+        // field independently on the original capture instead of discarding it with a weaker board.
+        if !upstream && rf.as_ref().is_none_or(|r| r.text.len()!=1 || r.score<DIGIT_MIN) {
+            let raw=gray(captured);
+            for extra in [0.0,100.0*l.k] {
+                let mut band=l.refresh;band.w+=extra;
+                if let Some(read)=read_text(captured,&raw,&band,TextKind::Refresh,&data.digits["refresh"])
+                    .filter(|r|r.text.len()==1 && r.text.parse::<i32>().is_ok_and(|n|(0..=9).contains(&n))
+                        && r.score>=DIGIT_MIN && r.score-r.second>=0.06) {
+                    rf=Some(read);break;
+                }
+            }
+        }
         let left: f64 = rf.as_ref().map_or(f64::NAN, |r| if r.text.is_empty() { 0.0 } else { r.text.parse::<f64>().unwrap_or(f64::NAN) });
         let ok = rf.as_ref().is_some_and(|r| left.fract() == 0.0 && (0.0..=9.0).contains(&left) && r.score >= DIGIT_MIN);
         let v = Some(if ok { left as i32 } else { 0 });

@@ -1,4 +1,4 @@
-# Torchlight Helper 1.2.4
+# Torchlight Helper 1.2.5
 
 토치라이트: 인피니트의 타르타로스와 블러드 러스트 수술 준비를 돕는 Windows 10/11 x64용 비공식 추천 오버레이입니다. 화면과 게임 로그를 읽으며, 카드 선택과 확인은 사용자가 직접 진행합니다.
 
@@ -6,7 +6,7 @@
 
 ## 실행
 
-1. 릴리스의 `TorchlightHelper-KO-1.2.4-win-x64.zip` 전체를 새 폴더에 풉니다. `Source code` ZIP은 실행 파일이 아닙니다.
+1. 릴리스의 `TorchlightHelper-KO-1.2.5-win-x64.zip` 전체를 새 폴더에 풉니다. `Source code` ZIP은 실행 파일이 아닙니다.
 2. 기존 오버레이를 종료하고 `TorchlightHelper.exe`를 실행합니다. .NET과 타르타로스 한국어 OCR 모델을 포함합니다.
 3. 게임 언어를 맞추고 `콘텐츠 자동 감지`를 켭니다. 콘텐츠 자동 전환을 쓰려면 게임의 계정 관련 설정에서 로그를 활성화한 뒤 재접속합니다.
 4. 로그를 자동으로 찾지 못하면 `로그 선택`에서 `UE_game/Torchlight/Saved/Logs/UE_game.log`를 지정합니다.
@@ -78,3 +78,5 @@ python package.py
 세부 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [tartarus/LICENSE](tartarus/LICENSE), [vorax/LICENSE](vorax/LICENSE)를 참조하세요. 게임명·그림·인식 템플릿은 각 권리자에게 귀속됩니다.
 
 같은 선택 화면에서 확인한 라운드·탱크·카드는 임시로 기억하며 미확인 카드 한 장씩만 안내합니다. 노멀포션의 회색 확대 카드도 읽습니다. 실제 선택이나 새로고침이 확인되면 기억을 갱신합니다.
+
+인식 실패 시 라운드·탱크·카드·새로고침 중 실패한 항목을 표시하고 해당 위치를 파란색으로 안내합니다. 새로고침 횟수는 보정 전 원본 영역으로도 검증하며 숫자가 없으면 0회로 확정하지 않습니다.

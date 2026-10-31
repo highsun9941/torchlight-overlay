@@ -11,6 +11,7 @@ mod draw;
 mod card_frame;
 mod pipeline;
 mod round_memory;
+mod feedback;
 #[cfg(windows)]
 mod app;
 

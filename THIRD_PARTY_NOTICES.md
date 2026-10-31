@@ -30,3 +30,5 @@ Additional modifications in 1.2.1: verified tank-state change detection, glyph-r
 1.2.3 fork modifications add per-frame title-row localization, Hangul-preserving background removal, bounded unique title-fragment matching and regression captures. No third-party runtime dependencies are added.
 
 1.2.4 fork modifications add per-offer confirmed-field memory, sequential assisted card requests, neutral tooltip edge fitting, round-fraction preprocessing, and a reported digit-font sample. No third-party runtime dependencies are added.
+
+1.2.5 fork modifications add original-capture refresh counter recovery, explicit read-only failure feedback and locations, and damaged-leading-modifier checks. No runtime dependencies are added.
