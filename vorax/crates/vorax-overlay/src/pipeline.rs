@@ -745,6 +745,24 @@ mod tests {
             }}
             assert!(watch.differs(&changed,1.0),"real counters/panel must invalidate advice while hovering");
         }
+        let mut no_popup=first.clone();let tip=vorax_scan::hover::tooltip(&first).unwrap();
+        for band in [vorax_scan::pixels::Rect::new(tip.rect.x-8.0,tip.rect.y-8.0,tip.rect.w+16.0,tip.rect.h+16.0),
+            vorax_scan::pixels::Rect::new(l.cards[0].cx-60.0*l.k,l.cards[0].cy-32.0*l.k,120.0*l.k,30.0*l.k)] {
+            for y in band.y as usize..(band.y+band.h) as usize {for x in band.x as usize..(band.x+band.w) as usize {
+                let at=(y*no_popup.width+x)*4;no_popup.data[at..at+3].copy_from_slice(&[30,20,20]);
+            }}
+        }
+        assert!(vorax_scan::hover::tooltip(&no_popup).is_none());
+        watch.accept(&first,1.0);
+        assert!(!watch.differs(&no_popup,1.0),"popup exit is fan restoration, not a new board");
+        assert_eq!(watch.observe(&no_popup,1.0,6000.0),Change::Unchanged);
+        assert_eq!(watch.observe(&no_popup,1.0,6500.0),Change::Unchanged);
+        let mut new_title=no_popup.clone();let c=l.cards[0];
+        for y in (c.cy-32.0*l.k) as usize..(c.cy-2.0*l.k) as usize {for x in (c.cx-60.0*l.k) as usize..(c.cx+60.0*l.k) as usize {
+            let at=(y*new_title.width+x)*4;new_title.data[at..at+3].copy_from_slice(&[220,220,220]);
+        }}
+        assert!(watch.differs(&new_title,1.0),"after the one-time fan rebase, actual card changes must be watched again");
+        watch.accept(&first,1.0);
         // Keep the last verified watcher value across a momentarily occluded number, then recover
         // without manufacturing a second change event solely because confidence returned.
         let mut occluded=first.clone();let band=l.aq_band[1];
