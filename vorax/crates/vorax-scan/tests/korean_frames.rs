@@ -55,6 +55,7 @@ fn localized_title_samples_survive_resizing_without_guessing_unknown_titles() {
         let frame = load(file);
         let img = windowed_game(&frame).map_or_else(|| frame.clone(), |r| crop_to(&frame, &r));
         let base = layout(img.width, img.height);
+        assert!(vorax_scan::titles::localized_hand_geometry(&img, &base), "{file}: Korean geometry");
         let known: [&str; 3] = match file {
             "instrument-no-reroll.png" => ["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"],
             "potion-round1.png" => ["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"],

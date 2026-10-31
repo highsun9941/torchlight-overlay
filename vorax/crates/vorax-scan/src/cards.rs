@@ -190,7 +190,7 @@ fn read_at_impl(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData
             continue;
         };
         if !use_text {
-            if let Some((name, score)) = crate::titles::localized_title(img, c, l.k, &ranked) {
+            if let Some((name, score)) = crate::titles::localized_title(img, c, l.k, &ranked[..ranked.len().min(5)]) {
                 ranked.retain(|(n, _)| n != &name);
                 ranked.insert(0, (name.clone(), score));
                 ranks.push(ranked.iter().take(KEEP_RANKS).cloned().collect());
@@ -238,9 +238,7 @@ pub fn read_hand(img: &Img, l: &Layout, data: &ScanData) -> HandRead {
 /// using language-independent art, and keep uncertain slots explicit for OCR to resolve.
 pub fn read_hand_adaptive(img: &Img, l: &Layout, data: &ScanData) -> HandRead {
     let mut head = header_only(img, l, data);
-    let phases: Vec<&str> = if head.fields.get("phase").is_some_and(|f| f.sure) {
-        vec![head.phase.as_deref().unwrap_or("potion")]
-    } else { vec!["potion", "instrument", "protocol"] };
+    let phases = ["potion", "instrument", "protocol"];
     let mut best: Option<(String, SlotsRead, f64)> = None;
     for phase in phases {
         let size = if phase == "potion" { fan_size(img, l) } else { 3 };

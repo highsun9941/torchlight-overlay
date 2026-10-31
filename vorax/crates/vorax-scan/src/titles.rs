@@ -75,7 +75,7 @@ pub fn localized_hand_geometry(img: &Img, l: &crate::layout::Layout) -> bool {
 
 pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f64)]) -> Option<(String, f64)> {
     let refs = localized_refs();
-    if !candidates.iter().take(5).any(|(name, score)| *score >= ART_SUPPORT && refs.contains_key(name)) { return None; }
+    if !candidates.iter().any(|(name, score)| *score >= ART_SUPPORT && refs.contains_key(name)) { return None; }
     let mut scores: std::collections::BTreeMap<&String, f64> = std::collections::BTreeMap::new();
     for (dx, dy) in [(0.0, 0.0), (-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)] {
         let mut at = *c;
@@ -94,7 +94,7 @@ pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f6
     let (name, score) = ranked.first()?;
     let second = ranked.get(1).map_or(0.0, |x| x.1);
     (*score >= 0.94 && *score - second >= 0.06
-        && candidates.iter().take(5).any(|(n, s)| n == *name && *s >= ART_SUPPORT))
+        && candidates.iter().any(|(n, s)| n == *name && *s >= ART_SUPPORT))
         .then(|| ((*name).clone(), *score))
 }
 
