@@ -1,0 +1,67 @@
+using System.Windows;
+using System.Windows.Threading;
+
+namespace Tartarus.App;
+
+public partial class App : Application
+{
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        // The interface is in English (localization comes later): numbers as "12,800" and "6.4" whatever Windows' language.
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        // A new version put in this install's place by itself (Updates.StartInstall), then started there.
+        if (e.Args is ["--install-update", _, _, ..])
+        {
+            Updates.InstallHere(e.Args[1..]);
+            Shutdown();
+            return;
+        }
+        DispatcherUnhandledException += OnUnhandled;
+        var settings = AppSettings.Load();
+        // --debug: the whole window (overlay views, hint quality, labels, dataset collecting, the log); else the player's.
+        settings.Debug = e.Args.Any(a => a.Equals("--debug", StringComparison.OrdinalIgnoreCase) || a.Equals("/debug", StringComparison.OrdinalIgnoreCase));
+        settings.Save(); // so settings.json exists to edit (hotkeys etc.)
+        if (!settings.Debug) settings.PlayerView();
+        // This personal build keeps diagnostics local.
+        settings.ReportDsn = "";
+        Tartarus.Rules.RunScore.SetWorth(settings.CacheWorth);
+        // The app is going down: only the stack and the version go, there's no asking.
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex) BugReports.Crash(ex, fatal: true);
+        };
+        ControlWindow? main = null;
+        _watchdog = new UiWatchdog(Dispatcher, () => main?.GameLogPath);
+        main = new ControlWindow(settings);
+        MainWindow = main;
+        main.ContentRendered += (_, _) => _watchdog?.Started();
+        main.Show();
+        int preview = Array.IndexOf(e.Args, "--preview-ui");
+        if (preview >= 0 && preview + 1 < e.Args.Length)
+            main.ContentRendered += async (_, _) =>
+            {
+                await main.ExportUiPreview(e.Args[preview + 1]);
+                Shutdown();
+            };
+    }
+
+    private UiWatchdog? _watchdog;
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _watchdog?.Dispose();
+        base.OnExit(e);
+    }
+
+    private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        e.Handled = true;
+        try { System.IO.File.AppendAllText(AppSettings.LogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Error: {e.Exception}{Environment.NewLine}"); }
+        catch { }
+        // The app goes on: the player may send a report of it, with what was on screen.
+        if (MainWindow is ControlWindow control && BugReports.Enabled) control.Report(e.Exception);
+        else MessageBox.Show(e.Exception.ToString(), "토치라이트 오버레이: 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+}

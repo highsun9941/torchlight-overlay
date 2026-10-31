@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Preserve the upstream captured Windows log, including its CRLF endings.
+vorax/fixtures/vorax-log-excerpt.txt -whitespace

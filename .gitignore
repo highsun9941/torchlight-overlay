@@ -1,0 +1,13 @@
+research/
+.toolchain/
+.nuget/
+.dotnet/
+release/
+qa/
+.publish/
+**/target/
+**/bin/
+**/obj/
+**/user-data/
+**/models/ocr/*.onnx
+**/models/ocr/dict_*.txt
