@@ -211,7 +211,6 @@ fn num(x: f64) -> String {
 /// resemble empty red glass, even while the blue name and a valid numeric pair are visible.
 fn name_colour(img: &Img, band: &Rect) -> [f64; 3] {
     let original=brightest(img,band);
-    if !empty_glow(original) && rarity_of(original).0==Rarity::Boss { return original; }
     let boxes=glyphs(img,band,TextKind::Label);
     if boxes.len()<2 {return original;}
     let x=boxes.iter().map(|b|b.x).fold(f64::INFINITY,f64::min);
