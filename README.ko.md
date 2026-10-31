@@ -1,4 +1,4 @@
-# Torchlight Helper 1.2.0
+# Torchlight Helper 1.2.1
 
 [실행 방법, 최대 성능 모드, 진단과 빌드 안내는 README.md에 있습니다.](README.md)
 

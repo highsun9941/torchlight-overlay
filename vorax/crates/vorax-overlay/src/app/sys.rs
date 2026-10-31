@@ -228,7 +228,6 @@ impl Settings {
 
 /// Mouse position only; this helper never generates input.
 pub fn hovered_card(hwnd:Hwnd, ui:f64, size:usize)->Option<usize> {
-    if unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() } != hwnd.get() { return None; }
     let (cx,cy,w,h)=client_rect(hwnd)?;
     let mut point=windows::Win32::Foundation::POINT::default();
     unsafe {windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).ok()?;}

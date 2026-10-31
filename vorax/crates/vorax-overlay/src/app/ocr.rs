@@ -18,6 +18,10 @@ pub struct Ocr {
 impl Ocr {
     pub fn new() -> windows::core::Result<Ocr> {
         let requested = std::env::var("VORAX_LANGUAGE").unwrap_or_else(|_| "ko".into());
+        Self::for_language(&requested)
+    }
+
+    pub(crate) fn for_language(requested: &str) -> windows::core::Result<Ocr> {
         let en = Language::CreateLanguage(&HSTRING::from(if requested == "ko" { "ko-KR" } else { "en-US" }))?;
         if requested == "ko" && !OcrEngine::IsLanguageSupported(&en)? {
             return Err(windows::core::Error::new(windows::core::HRESULT(0x80070032u32 as i32), "Windows Korean OCR is not installed; using card art"));

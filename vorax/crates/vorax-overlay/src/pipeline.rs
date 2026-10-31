@@ -230,6 +230,11 @@ impl Pipeline {
             }
             None => scan(&img, data, true),
         };
+        if !raw.has(|p|matches!(p,Problem::Animating)) && raw.state.hand.is_empty() && raw.hand_ranks.as_ref().is_none_or(|h|h.is_empty())
+            && raw.hand_pending!=Some(true) && raw.fields.get("phase").is_none_or(|f|!f.sure)
+            && raw.fields.get("round").is_none_or(|f|!f.sure) {
+            self.reset_hover();return Outcome::NotGame;
+        }
         if raw.has(|p| matches!(p, Problem::Animating)) {
             return Outcome::Animating;
         }
@@ -270,6 +275,7 @@ impl Pipeline {
         }
         reading.state.shelley = Some(self.shelley);
         self.fill_rerolls(&mut reading);
+        self.apply_zoom(&mut reading);
         let read_ms = t.elapsed().as_secs_f64() * 1000.0;
         if !trustworthy(&reading) { return Outcome::Uncertain { reading: Box::new(reading) }; }
         let (advice, cached) = self.advise(&reading.state);
@@ -560,6 +566,109 @@ mod tests {
         assert!(r.fields["hand0"].sure);assert!(pipe.requested_slots().is_empty());
         assert_eq!(r.state.hand,["Digestive Enzyme Solution","Spinal Solution - Aemberon","Viscous Bile Solution"]);
         r.state.round=Some(7);pipe.apply_zoom(&mut r);assert!(pipe.zoom_names.is_empty());
+    }
+
+    fn reported(file:&str) -> super::Img {
+        let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/reported").join(file)).unwrap();
+        super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
+    }
+
+    #[test]
+    fn reported_red_heart_does_not_hide_the_blue_pest_and_settings_are_not_a_board() {
+        use super::*;
+        for file in ["hover-before.png","hover-after.png","board-before.png","board-after.png"] {
+            let img=reported(file);let r=scan(&img,scan_data(),true);
+            let values:Vec<_>=r.state.tanks.iter().map(|m|m.as_ref().map(|m|(m.archetype,m.rarity,m.activity,m.quantity))).collect();
+            assert_eq!(values[0],Some((vorax::types::Archetype::Agito,vorax::types::Rarity::Rare,15,12)),"{file}");
+            assert_eq!(values[1],Some((vorax::types::Archetype::Pest,vorax::types::Rarity::Magic,5,24)),"{file}: {}",serde_json::to_string(&r).unwrap());
+            assert_eq!(values[2],values[0],"{file}");
+            assert!(values[3..].iter().all(Option::is_none),"{file}");
+            assert_eq!(r.state.round,Some(1));
+        }
+        let mut pipe=Pipeline::new(0);
+        assert!(matches!(pipe.run(&reported("settings.png"),None,None),Outcome::NotGame));
+    }
+
+    #[test]
+    fn recorded_flames_do_not_veto_advice_but_a_verified_number_change_does() {
+        use super::*;
+        use vorax_scan::watch::{Change,ScreenWatch};
+        let before=reported("board-before.png");let after=reported("board-after.png");
+        let mut watch=ScreenWatch::default();watch.accept(&before,1.0);
+        assert!(!watch.differs(&after,1.0),"reported unchanged board: {:?}",watch.compare(&after,1.0));
+        let l=layout_at(before.width,before.height,1.0);
+        let mut flame=before.clone();
+        // This previously watched empty-tank band is scenery. It contains no valid numeric pair.
+        for r in [l.name_band[3],l.total_band[3],l.aq_band[3],l.icon[4]] {
+            for y in r.y as usize..(r.y+r.h) as usize {for x in r.x as usize..(r.x+r.w) as usize {
+                let at=(y*flame.width+x)*4;flame.data[at..at+3].copy_from_slice(&[220,40,60]);
+            }}
+        }
+        assert!(!watch.differs(&flame,1.0),"empty glass cannot invalidate a correctly read board");
+        let mut changed=before.clone();
+        let k=l.k;
+        let src=vorax_scan::pixels::crop(&before,vorax_scan::pixels::Rect::new(l.tank_cx[1]-150.0*k,l.name_band[1].y-40.0*k,300.0*k,120.0*k));
+        let left=(l.tank_cx[0]-150.0*k).round() as usize;let top=(l.name_band[0].y-40.0*k).round() as usize;
+        for y in 0..src.height {for x in 0..src.width {
+            let to=((top+y)*changed.width+left+x)*4;let from=(y*src.width+x)*4;
+            changed.data[to..to+4].copy_from_slice(&src.data[from..from+4]);
+        }}
+        assert!(watch.differs(&changed,1.0),"a new validated 5×24 pair must still trigger a read");
+        assert_eq!(watch.observe(&changed,1.0,500.0),Change::Changed);
+        assert_eq!(watch.observe(&changed,1.0,1000.0),Change::Ready);
+        let read=scan(&changed,scan_data(),false);
+        assert_eq!(read.state.tanks[0].as_ref().map(|m|(m.activity,m.quantity)),Some((5,24)));
+    }
+
+    #[test]
+    fn captured_ocr_spelling_and_tooltip_route_work_without_a_pointer_target() {
+        use super::*;
+        let frame=reported("hover-before.png");
+        // Actual OCR spelling captured in overlay(2).log, rather than a perfect supplied title.
+        let mut text=|_:&Img|"엉켜불은 척골\n최소 2 그를 해골\n경비병 보유 시,".to_string();
+        let read=vorax_scan::hover::recognize(&frame,"instrument",&[],&mut text).unwrap();
+        assert_eq!(read.name,"Adherent Metatarsals");
+        let candidates=vec![(0,vec![("Adherent Metatarsals".into(),0.99)])];
+        assert_eq!(vorax_scan::hover::target(&read.name,&candidates,None),Some(0));
+        let mut pipe=Pipeline::new(0);
+        // Exercise the public production path. Calling apply_zoom directly would miss a wiring bug.
+        fn recorded_titles()->impl FnMut(&Img)->String {
+            let mut heading=0;
+            move |img:&Img| {
+                if (img.width,img.height)==(464,120) {
+                    heading+=1;
+                    match heading {1=>"엉켜“\n=츼골",2=>"비대한 늬하수체",_=>"오그라는 손가락"}.to_string()
+                } else {"엉켜불은적골\n최소 2 그룹 해골\n경비병 보유 시,".to_string()}
+            }
+        }
+        let mut failed_text=recorded_titles();
+        let first=pipe.run(&frame,None,Some(&mut failed_text));
+        assert!(matches!(first,Outcome::Uncertain{..}),"reported first title must request assistance");
+        assert_eq!(pipe.requested_slots(),[0],"run must request only the failed title");
+        assert!(pipe.hover_plan().is_some(),"an unresolved card needs the blue guide");
+        assert!(!pipe.confirm_hover(0,&read,500.0));assert!(pipe.confirm_hover(0,&read,1000.0));
+        assert!(!pipe.requested_slots().contains(&0));
+        let mut failed_text=recorded_titles();
+        let result=pipe.run(&reported("board-before.png"),None,Some(&mut failed_text));
+        match result {
+            Outcome::Advice{reading,..} => {assert_eq!(reading.state.hand[0],"Adherent Metatarsals");assert!(reading.fields["hand0"].sure);},
+            Outcome::Uncertain{reading} => panic!("completed hover must reach advice: {}",serde_json::to_string(&reading).unwrap()),
+            _ => panic!("completed hover must reach advice"),
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "requires installed Windows Korean OCR; CI runs this separately when available"]
+    fn native_windows_korean_ocr_reads_reported_tooltip() {
+        use super::*;
+        unsafe {let _=windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);}
+        let ocr=crate::app::ocr::Ocr::for_language("ko").expect("Windows Korean OCR capability");
+        for file in ["hover-before.png","hover-after.png"] {
+            let frame=reported(file);let mut text=|img:&Img|ocr.read(img).unwrap();
+            let read=vorax_scan::hover::recognize(&frame,"instrument",&[],&mut text);
+            assert!(matches!(&read,Ok(r) if r.name=="Adherent Metatarsals"),"{file}: {read:?}");
+        }
     }
 
 }

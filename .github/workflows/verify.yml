@@ -32,6 +32,24 @@ jobs:
           dotnet-version: 9.0.x
       - name: Native regression tests
         run: cargo test --release --locked --workspace --manifest-path vorax/Cargo.toml
+      - name: Exercise real Korean Windows OCR when the OS capability is present
+        shell: powershell
+        run: |
+          try {
+            $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+            $null = [Windows.Globalization.Language, Windows.Globalization, ContentType = WindowsRuntime]
+            $lang = [Windows.Globalization.Language]::new('ko-KR')
+            $supported = [Windows.Media.Ocr.OcrEngine]::IsLanguageSupported($lang)
+          } catch {
+            Write-Host "KOREAN_OCR_INTEGRATION_UNAVAILABLE: $($_.Exception.Message)"
+            exit 0
+          }
+          if (!$supported) {
+            Write-Host 'KOREAN_OCR_INTEGRATION_UNAVAILABLE: OS language capability is not installed; no runtime claim is made.'
+            exit 0
+          }
+          cargo test --release --locked --manifest-path vorax/Cargo.toml -p vorax-overlay native_windows_korean_ocr_reads_reported_tooltip -- --ignored --nocapture --test-threads=1
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Windows Korean OCR integration failed' }
       - name: Tartarus regression tests
         run: dotnet test tartarus/tests/Tartarus.Rules.Tests/Tartarus.Rules.Tests.csproj -c Release -p:Platform=x64 --logger trx
       - name: Build portable Windows helper
@@ -63,7 +81,7 @@ jobs:
         run: python package.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TorchlightHelper-1.2.0-win-x64
+          name: TorchlightHelper-1.2.1-win-x64
           path: |
             release/*.zip
             release/*.sha256
@@ -79,12 +97,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: TorchlightHelper-1.2.0-win-x64
+          name: TorchlightHelper-1.2.1-win-x64
           path: release
       - name: Publish release after both test suites pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v1.2.0 >/dev/null 2>&1; then
-            gh release create v1.2.0 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.0 — OCR 개선" --notes-file RELEASE_NOTES.md
+          if ! gh release view v1.2.1 >/dev/null 2>&1; then
+            gh release create v1.2.1 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.1 — OCR 개선" --notes-file RELEASE_NOTES.md
           fi
