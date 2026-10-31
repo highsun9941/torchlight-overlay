@@ -39,12 +39,39 @@ fn korean_windows_have_verified_tank_values_and_rounds() {
         if let Some(n) = refreshes {
             assert!(reading.fields["refreshes"].sure, "{file}: rerolls");
             assert_eq!(reading.state.potion_refreshes, Some(n), "{file}: rerolls");
+            assert_eq!(reading.state.instruments, ["Contracted Claws"], "{file}: equipped instrument");
+        } else {
+            assert!(reading.state.instruments.is_empty(), "{file}: starting map item is not an equipped instrument");
         }
     }
 }
 
 #[test]
-fn translated_cards_can_be_read_from_art_without_english_text_shapes() {
+fn localized_title_samples_survive_resizing_without_guessing_unknown_titles() {
+    use vorax_scan::layout::layout;
+    use vorax_scan::pixels::resize;
+    use vorax_scan::titles::localized_title;
+    for file in ["instrument-no-reroll.png", "potion-round1.png", "potion-round4-ultrawide.png"] {
+        let frame = load(file);
+        let img = windowed_game(&frame).map_or_else(|| frame.clone(), |r| crop_to(&frame, &r));
+        let base = layout(img.width, img.height);
+        let known: [&str; 3] = match file {
+            "instrument-no-reroll.png" => ["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"],
+            "potion-round1.png" => ["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"],
+            _ => ["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"],
+        };
+        let larger = resize(&img, (img.width as f64 * 1.25).round() as usize, (img.height as f64 * 1.25).round() as usize);
+        let l = layout(larger.width, larger.height);
+        for (j, name) in known.iter().enumerate() {
+            let candidates = vec![(name.to_string(), 0.99)];
+            assert_eq!(localized_title(&larger, &l.cards[j], l.k, &candidates).map(|x| x.0), Some(name.to_string()), "{file}: resized title {j}");
+            assert!(localized_title(&img, &base.cards[j], base.k, &[("unknown card".into(), 0.99)]).is_none());
+        }
+    }
+}
+
+#[test]
+fn translated_cards_use_art_and_korean_titles_without_english_text_shapes() {
     for (file, hand) in [
         ("instrument-no-reroll.png", vec!["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"]),
         ("potion-round1.png", vec!["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"]),

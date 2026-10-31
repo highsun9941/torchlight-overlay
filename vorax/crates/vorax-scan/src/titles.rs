@@ -5,7 +5,7 @@
 use crate::cards::read_at;
 use crate::data::ScanData;
 use crate::layout::{card_face, layout_at, CardPos};
-use crate::pixels::{clamp_u8, patch, resize, Img, Rect};
+use crate::pixels::{clamp_u8, dot, patch, resize, signature, Img, Rect};
 use crate::reading::{FieldRead, Fields, Problem, Reading};
 use std::collections::HashMap;
 
@@ -59,6 +59,37 @@ pub fn name_fit(name: &str, text: &str) -> f64 {
 const TITLE_AREA: Rect = Rect::new(-140.0, -110.0, 280.0, 150.0);
 const ZOOM: f64 = 2.0;
 const BLUR: usize = 8;
+
+/// A compact, high-confidence title-shape supplement for the reported Korean font. It can only
+/// disambiguate a name already supported by the card art; unknown titles continue through OCR.
+pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f64)]) -> Option<(String, f64)> {
+    use std::sync::OnceLock;
+    static TITLES: OnceLock<std::collections::BTreeMap<String, Vec<Vec<f64>>>> = OnceLock::new();
+    let refs = TITLES.get_or_init(|| serde_json::from_str(include_str!("../../../data/scan/korean-titles.json")).expect("Korean title samples"));
+    if !candidates.iter().take(5).any(|(name, score)| *score >= ART_SUPPORT && refs.contains_key(name)) { return None; }
+    let mut scores: std::collections::BTreeMap<&String, f64> = std::collections::BTreeMap::new();
+    for (dx, dy) in [(0.0, 0.0), (-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)] {
+        let mut at = *c;
+        at.cx += dx * k;
+        at.cy += dy * k;
+        let crop = title_crop(img, &at, k);
+        let value = signature(&crop, Rect::new(30.0, 160.0, 500.0, 96.0), 64, 16);
+        for (name, samples) in refs {
+            let score = samples.iter().map(|v| dot(v, &value)).fold(f64::NEG_INFINITY, f64::max);
+            let old = scores.entry(name).or_insert(f64::NEG_INFINITY);
+            *old = old.max(score);
+        }
+    }
+    let mut ranked: Vec<_> = scores.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let (name, score) = ranked.first()?;
+    let second = ranked.get(1).map_or(0.0, |x| x.1);
+    (*score >= 0.94 && *score - second >= 0.06
+        && candidates.iter().take(5).any(|(n, s)| n == *name && *s >= ART_SUPPORT))
+        .then(|| ((*name).clone(), *score))
+}
+
+const ART_SUPPORT: f64 = 0.92;
 
 /// A card's title area, straightened and enlarged, as dark text on white.
 pub fn title_crop(img: &Img, c: &CardPos, k: f64) -> Img {

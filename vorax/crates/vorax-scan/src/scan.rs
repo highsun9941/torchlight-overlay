@@ -97,6 +97,7 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
     let img = corrected_img.as_ref().unwrap_or(captured);
     let dy = match hand_dy {
         Some(d) => d,
+        None if !upstream && cards_present(img, &l0) == 3 => 0.0,
         None => find_hand(img, &l0, data),
     };
     let l = l0.shifted_hand(dy);
@@ -182,7 +183,8 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
         fields.insert("refreshes".into(), FieldRead { sure: ok, guess: rf.as_ref().map(|r| r.text.clone()), score: rf.as_ref().map(|r| r.score), second: rf.as_ref().map(|r| r.second) });
     }
 
-    let inst = read_instruments(img, &l, data);
+    let inst = if upstream { read_instruments(img, &l, data) }
+        else { crate::instruments::read_instruments_adaptive(img, &l, data) };
     state.instruments = inst.names.clone();
     fields.extend(inst.fields.clone());
 

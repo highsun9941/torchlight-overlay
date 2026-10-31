@@ -10,3 +10,5 @@ Game artwork remains the property of its rights holders. These files contain the
 | potion-round4-ultrawide.png | 4 | Osteolytic Ointment; Twin Hormone - Pest; Potion Kit (Small) | 1×186; 5×328; 1×109 | 1 |
 
 `data/scan/korean-round.json` adds one labelled round-4 glyph from the third frame to the adaptive font fallback. It does not contain a screenshot fingerprint or an assumed board state. The legacy reference reader continues to use its original samples unchanged.
+
+`korean-titles.json` contains normalized, small title-shape vectors for the nine labelled offers. They can only resolve names already supported by the art candidates, with a strict similarity and separation threshold. Unseen titles remain the job of Windows Korean OCR. `korean-panel.json` supplements the known starting map-item icon and Contracted Claws. Starting items are excluded from the equipped instruments, as in the original reader.

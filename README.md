@@ -1,92 +1,68 @@
-# 토치라이트 오버레이
+# Torchlight Helper 1.1.0
 
-토치라이트: 인피니트의 **타르타로스**와 **블러드 러스트 수술 준비**를 위한 한국어 추천 오버레이입니다. 화면과 게임 로그를 읽어 카드와 대상 탱크를 표시합니다. 선택은 플레이어가 직접 합니다.
+토치라이트: 인피니트의 타르타로스와 블러드 러스트 수술 준비를 돕는 Windows 10/11 x64용 비공식 추천 오버레이입니다. 화면과 게임 로그를 읽으며, 카드 선택과 확인은 사용자가 직접 진행합니다.
 
-**[최신 Windows ZIP 다운로드](https://github.com/kinam-ssafy/torchlight-overlay/releases/latest)**
+**[Windows 실행용 ZIP 다운로드](https://github.com/highsun9941/torchlight-overlay/releases/latest)** · [빌드·회귀 검사](https://github.com/highsun9941/torchlight-overlay/actions/workflows/verify.yml)
 
-![블러드 러스트 카드 추천 예시](docs/images/vorax-example.png)
+## 실행
 
-## 설치와 실행
+1. 릴리스의 `TorchlightHelper-KO-1.1.0-win-x64.zip` 전체를 새 폴더에 풉니다. `Source code` ZIP은 실행 파일이 아닙니다.
+2. 기존 오버레이를 종료하고 `TorchlightHelper.exe`를 실행합니다. .NET과 타르타로스 한국어 OCR 모델을 포함합니다.
+3. 게임 언어를 맞추고 `콘텐츠 자동 감지`를 켭니다. 게임의 계정 관련 설정에서 로그를 활성화한 뒤 재접속해야 합니다.
+4. 로그를 자동으로 찾지 못하면 `로그 선택`에서 `UE_game/Torchlight/Saved/Logs/UE_game.log`를 지정합니다.
+5. 블러드 러스트에서는 실제 인턴 의사 세라일 보유 단계를 설정합니다. 미보유는 그대로 `미보유`를 선택합니다.
 
-1. Releases에서 `TorchlightHelper-KO-1.0.1-win-x64.zip`을 받습니다. GitHub의 `Source code` ZIP은 실행용이 아닙니다.
-2. ZIP **전체를** 쓰기 가능한 폴더에 압축 해제합니다.
-3. `TorchlightHelper.exe`를 실행합니다. .NET 런타임과 타르타로스 한국어 OCR 모델이 포함되어 있습니다.
-4. 기존 TartarusSolver 등 동일 단축키를 사용하는 도구는 종료합니다.
-5. 게임을 창 모드 또는 테두리 없는 창 모드로 실행하고 게임 언어를 선택합니다. `콘텐츠 자동 감지`는 기본으로 켜져 있습니다.
+게임은 창 모드 또는 테두리 없는 창 모드로 사용합니다. 설정 창과 툴팁이 선택지를 가리지 않게 합니다. 설정·기록은 실행 파일 옆 `user-data`에 저장됩니다.
 
-Windows 10/11 x64용입니다. 자동 인식을 사용하려면 게임의 계정 관련 설정에서 로그를 활성화하고 재접속하세요. 자동으로 연결되지 않으면 `로그 선택`에서 다음 파일을 지정합니다.
+## 인식과 최대 성능
 
-```text
-게임 설치 폴더/UE_game/TorchLight/Saved/Logs/UE_game.log
-```
+블러드 러스트 탭의 **CPU 사용 → 최대 성능**은 OS가 보고하는 모든 논리 CPU 스레드를 사용하고, 잘 읽히지 않는 카드 제목에 확대·대비 처리를 추가로 시도합니다. 코어 수는 자동으로 결정합니다. 기본 균형 모드는 기존 절반 코어·최대 8개 제한을 유지합니다.
 
-## 콘텐츠 자동 감지
+CUDA, GPU용 Python 환경, 외부 OCR 서버를 추가하지 않습니다. Windows 한국어 OCR을 활용하며, 번역된 카드 설명 모양에 의존하지 않는 그림 인식으로 보완합니다. 한국어 OCR이 없을 때 영어 OCR을 한국어 인식처럼 사용하지 않습니다.
 
-게임 로그를 켜두면 타르타로스 보드와 블러드 러스트 수술 준비에 들어갈 때 자동으로 전환됩니다. **프로그램으로 돌아와 탭을 바꿀 필요가 없습니다.** 선택한 콘텐츠의 엔진만 실행하며, 콘텐츠 종료나 게임 창 종료를 감지하면 대기합니다. 이미 진행 중일 때 프로그램을 실행해도 로그에서 현재 화면을 복원합니다.
+수치는 예상 위치 주변에서 다시 찾고, **활성 × 수량이 화면의 총합과 일치하는 경우**만 채택합니다. 세라일 미보유로 새로고침 기능이 없는 도구 선택은 0회로 처리합니다. 첫 라운드부터 추천 대상입니다.
 
-자동 모드에서 탭은 설정을 보는 용도입니다. 직접 엔진을 선택하려면 `콘텐츠 자동 감지`를 끄고 탭을 선택하세요. 감지가 계속 대기하면 게임의 로그 활성화 및 로그 파일 연결을 확인하세요. 로그가 없거나 지원하지 않는 형식이면 수동 선택을 사용할 수 있습니다.
+화면 크기와 패치, 애니메이션 상태에 따라 실패할 수 있습니다. 읽지 못한 값은 임의로 확정하지 않으며, `인식 확인 필요`에 확인할 항목을 표시하고 추천을 숨깁니다. 제공된 실제 한국어 창 세 장은 `vorax/fixtures/korean`의 회귀 검사에 포함합니다.
 
-## 블러드 러스트
+## 단축키
 
-![설정 화면](docs/images/settings.png)
+| 콘텐츠 | 키 | 기능 |
+|---|---|---|
+| 타르타로스 | Ctrl+Shift+S | 지금 인식 |
+| 타르타로스 | Ctrl+Shift+R | 자동 인식 전환 |
+| 타르타로스 | Ctrl+Shift+H | 오버레이 전환 |
+| 블러드 러스트 | Ctrl+Alt+X | 지금 인식 |
+| 블러드 러스트 | Ctrl+Alt+V | 오버레이 전환 |
 
-- **펫 단계:** 인턴 의사 세라일의 미보유 또는 1~6단계를 선택합니다. 자동 저장됩니다. 화면에서 읽은 실제 남은 새로고침 횟수를 우선하고, 화면에 없는 초기값만 펫 단계로 보완합니다.
-- **탐색 품질:** 256 / 512 / 1,024회. 기본은 정밀 1,024회입니다. 더 많은 미래를 비교할수록 시간이 늘어납니다.
-- **CPU 사용:** 게임 우선 / 균형 / 추천 속도 우선. 각각 최대 4 / 8 / 12개 스레드를 사용하며, 실제 CPU 수에 맞춰 제한합니다. 기본은 균형입니다.
-- 카드가 펼쳐지면 추천 카드 번호와 밝은 테두리가 나타납니다. 대상이 필요한 포션은 배양 탱크 번호도 표시합니다.
-- `다시 인식` 또는 `Ctrl+Alt+X`로 현재 화면을 다시 읽습니다. `Ctrl+Alt+V`로 오버레이를 숨기거나 표시합니다.
-- 읽지 못한 카드나 수치가 있으면 추천을 숨깁니다. 가리는 툴팁을 치우고 다시 인식하세요.
+추천의 달성률은 현재 인식 상태와 기존 확률표로 계산한 추정입니다. 11~13라운드 수술 플랜은 캐릭터 조건에 따라 직접 판단하도록 안내합니다.
 
-금색 카드 제목의 한국어 OCR과 한국어 카드 크기에 맞춘 테두리 정렬을 보완했습니다. Windows 한국어 OCR이 없으면 이미지 인식으로 보완하지만 카드 인식률이 낮아질 수 있습니다.
+## 로컬 진단
 
-## 타르타로스
-
-자동 감지 상태에서 타르타로스 보드에 들어가면 연결과 인식이 시작됩니다. 인식 간격과 탐색 품질을 별도로 조절할 수 있습니다. 수동 모드에서는 콘텐츠 탭을 전환하면 이전 엔진이 정지합니다.
-
-| 단축키 | 기능 |
-|---|---|
-| Ctrl+Shift+S | 지금 인식 |
-| Ctrl+Shift+R | 자동 인식 전환 |
-| Ctrl+Shift+H | 오버레이 표시 전환 |
-| Ctrl+Shift+B | 로컬 진단 저장 |
-
-## 추천이 뜻하는 것
-
-타르타로스는 원본 솔버의 보상 가치와 목표를 사용합니다. 블러드 러스트는 현재 상태에서 미래 카드를 시뮬레이션해 **84만 활성 목표**에 유리한 선택을 비교합니다. 표시되는 비율은 모델의 추정이며 실제 성공이나 수익을 보장하지 않습니다.
-
-- 수술 플랜 **11~13라운드**는 캐릭터 생존력과 전투 조건에 따라 직접 선택하도록 안내합니다.
-- 한국어 카드명 78개를 연결했습니다. 미확인 7개 명칭은 영어로 표시됩니다.
-- 일부 특수 포션의 연속 효과와 모든 해상도/UI 배율/HDR 환경은 검증되지 않았습니다.
-- 실제 한국어 1920x1080 수술 준비 화면과 원본 회귀 자료로 검증했습니다. 전체 완주 보장이나 시장 시세 기반 수익 최적화 도구는 아닙니다.
-
-성능 수치와 실패 후 수정 내역은 [검증 기록](VALIDATION.md), 게임 자료와 구현 근거는 [조사 기록](RESEARCH.md)에 있습니다.
-
-같은 실제 보드의 균형 모드에서 첫 처리는 약 418~493ms, 동일 화면 재처리는 약 50~59ms로 측정했습니다. 탐색은 1,024회를 유지했습니다. 캡처와 게임 애니메이션 대기는 제외한 수치이며 PC와 보드에 따라 달라집니다.
-
-## 설정과 데이터
-
-설정과 로컬 기록은 실행 파일 옆 `user-data`에 저장됩니다. 업데이트 ZIP은 새 폴더에 풀고 필요할 때 기존 `user-data`만 옮기세요. 다른 사람에게 공유할 때는 Releases의 ZIP을 사용하세요. 본인 사용 폴더에는 설정, 게임 로그 경로, 진단 화면이 들어갈 수 있습니다.
-
-게임 메모리를 읽거나 변경하지 않고, 게임에 클릭이나 키 입력을 보내지 않습니다. 화면과 로그를 로컬에서 처리하며 자동 업데이트와 오류 자동 전송은 비활성화했습니다.
-
-## 빌드와 출처
-
-- `tartarus/`: [glcoder/TartarusSolver](https://github.com/glcoder/TartarusSolver) v0.7.20, MIT.
-- `vorax/`: [DinoRaos/vorax-solver-rs](https://github.com/DinoRaos/vorax-solver-rs) `9aabc20`, MIT. 원본 엔진은 tidewarden의 마지막 MIT 커밋 `7b4c9ba`까지입니다.
-- 게임 용어 대조: [TLIDB](https://tlidb.com/ko/Vorax_Season).
-
-Windows에서 .NET SDK 9 이상, Rust GNU 툴체인, Python 3을 설치합니다. 배포 ZIP의 `models/ocr`를 `tartarus/models/ocr`로 복사한 다음 실행합니다.
+실패 항목과 판독 결과는 `user-data/vorax/overlay.log`에 남습니다. 저장된 게임 PNG를 같은 실행 경로로 검사할 수도 있습니다. 창 제목줄은 자동으로 제외합니다.
 
 ```powershell
-./build.ps1
+$env:VORAX_LANGUAGE = 'ko'
+$env:VORAX_OCR_MODE = 'accurate'
+.\vorax-overlay.exe --inspect .\screen.png .\diagnosis
+```
+
+`diagnosis/reading.json`과 `client.png`가 생성됩니다. 진단은 로컬에 저장하며 자동 전송하지 않습니다.
+
+## 소스 빌드
+
+Windows에서 Rust stable, Visual Studio C++ Build Tools, .NET 9 SDK, Python 3를 준비합니다.
+
+```powershell
+cargo test --release --locked --workspace --manifest-path vorax/Cargo.toml
+dotnet test tartarus/tests/Tartarus.Rules.Tests/Tartarus.Rules.Tests.csproj -c Release -p:Platform=x64
+.\build.ps1
 python package.py
 ```
 
-검증 명령:
+첫 빌드는 NuGet·Cargo 패키지와 SHA-256으로 검증하는 OCR 모델을 다운로드합니다. 모델은 빌드 결과에 포함됩니다. GitHub Actions는 Rust 추적 회귀, 실제 화면 검사, Windows 빌드, UI 실행과 ZIP 무결성을 검사한 뒤 실행용 파일을 제공합니다.
 
-```powershell
-cargo test --release --workspace --manifest-path vorax/Cargo.toml
-dotnet test tartarus/tests/Tartarus.Rules.Tests/Tartarus.Rules.Tests.csproj -c Release -p:Platform=x64
-```
+## 출처와 라이선스
 
-[라이선스와 종속성 고지](THIRD_PARTY_NOTICES.md)를 유지해 주세요. 게임명과 게임 자산은 권리자에게 귀속됩니다. 이 프로젝트는 비공식 팬 도구이며 게임 제작사의 공식 제품이 아닙니다.
+[kinam-ssafy/torchlight-overlay](https://github.com/kinam-ssafy/torchlight-overlay)의 MIT 소스 `ddac4bfce7fe7551351d5cac7d8ef35096b2100d`를 기반으로 합니다. 타르타로스는 glcoder/TartarusSolver v0.7.20, 블러드 러스트는 DinoRaos/vorax-solver-rs 9aabc20과 그 안에 포함된 마지막 MIT 시뮬레이터를 사용합니다. 기존 엔진·확률표·저작권 고지는 보존합니다. 후속 비공개 라이선스 솔버 코드는 포함하지 않습니다.
+
+세부 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [tartarus/LICENSE](tartarus/LICENSE), [vorax/LICENSE](vorax/LICENSE)를 참조하세요. 게임명·그림·인식 템플릿은 각 권리자에게 귀속됩니다.

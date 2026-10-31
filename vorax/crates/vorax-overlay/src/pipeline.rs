@@ -139,7 +139,13 @@ impl Pipeline {
                 let names = scan(&img, data, false);
                 let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
                 let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
-                vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"))
+                let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
+                if named.state.hand.is_empty() || named.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. })) {
+                    let pictured = scan(&img, data, true);
+                    if !pictured.state.hand.is_empty() && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating)) {
+                        pictured
+                    } else { named }
+                } else { named }
             }
             None => scan(&img, data, true),
         };

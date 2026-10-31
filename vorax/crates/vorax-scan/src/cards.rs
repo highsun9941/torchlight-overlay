@@ -185,10 +185,20 @@ fn read_at_impl(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData
         .map(|(j, c)| if slots.is_some_and(|s| !s.contains(&j)) { None } else { Some(rank(img, c, l.k, &prefix, data, use_text)) })
         .collect();
     for (j, (c, ranked)) in pos.iter().zip(ranked_all).enumerate() {
-        let Some(ranked) = ranked else {
+        let Some(mut ranked) = ranked else {
             ranks.push(vec![]);
             continue;
         };
+        if !use_text {
+            if let Some((name, score)) = crate::titles::localized_title(img, c, l.k, &ranked) {
+                ranked.retain(|(n, _)| n != &name);
+                ranked.insert(0, (name.clone(), score));
+                ranks.push(ranked.iter().take(KEEP_RANKS).cloned().collect());
+                names.push(name.clone());
+                fields.insert(format!("hand{j}"), FieldRead { sure: true, guess: Some(name), score: Some(score), second: None });
+                continue;
+            }
+        }
         ranks.push(ranked.iter().take(KEEP_RANKS).cloned().collect());
         let key = format!("hand{j}");
         let top = ranked.first();
