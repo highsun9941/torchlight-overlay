@@ -189,7 +189,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         last_hovered=hovered;
                         let mut inspecting=false;
                         let requested=pipe.requested_slots();
-                        let tip=if requested.is_empty() && !pipe.hover_dirty() {None} else {vorax_scan::hover::tooltip(&frame)};
+                        let search=if requested.is_empty() && !pipe.hover_dirty() {None} else {Some(vorax_scan::hover::inspect_tooltip(&frame))};
+                        let tip=search.as_ref().and_then(|s|s.tooltip.as_ref());
                         if !requested.is_empty() {
                             if let (Some(_),Some(engine),Some(pending))=(tip.as_ref(),ocr.as_ref(),pipe.pending()) {
                                 inspecting=true;
@@ -221,7 +222,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                             } else {
                                 pipe.cancel_hover_candidate();
                                 if last_hover_wait.elapsed()>=Duration::from_secs(3) {
-                                    diagnostics::event(0,"hover_wait",serde_json::json!({"reason":if tip.is_none(){"tooltip_missing"}else{"ocr_unavailable"},"requested":requested,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0}));
+                                    diagnostics::event(0,"hover_wait",serde_json::json!({"reason":if tip.is_none(){"tooltip_missing"}else{"ocr_unavailable"},"requested":requested,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0,"tooltipSearch":search}));
+                                    if tip.is_none() {diagnostics::save(0,"tooltip_missing",&frame,None,pipe.pending(),&[],&[],serde_json::json!({"requested":requested,"tooltipSearch":search}));}
                                     last_hover_wait=Instant::now();
                                 }
                             }

@@ -32,6 +32,19 @@ jobs:
           dotnet-version: 9.0.x
       - name: Native regression tests
         run: cargo test --release --locked --workspace --manifest-path vorax/Cargo.toml
+      - name: Prepare Korean OCR capability on the temporary test runner
+        shell: powershell
+        timeout-minutes: 5
+        continue-on-error: true
+        run: |
+          try {
+            $cap = Get-WindowsCapability -Online | Where-Object { $_.Name -Like 'Language.OCR*ko-KR*' }
+            if (!$cap) { Write-Host 'KOREAN_OCR_SETUP_UNAVAILABLE: the runner does not offer this capability'; exit 0 }
+            Write-Host ($cap | Format-List | Out-String)
+            if ($cap.State -ne 'Installed') { $cap | Add-WindowsCapability -Online -ErrorAction Stop | Out-Host }
+          } catch {
+            Write-Host "KOREAN_OCR_SETUP_UNAVAILABLE: $($_.Exception.Message)"
+          }
       - name: Exercise real Korean Windows OCR when the OS capability is present
         shell: powershell
         run: |
@@ -81,7 +94,7 @@ jobs:
         run: python package.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TorchlightHelper-1.2.1-win-x64
+          name: TorchlightHelper-1.2.2-win-x64
           path: |
             release/*.zip
             release/*.sha256
@@ -97,12 +110,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: TorchlightHelper-1.2.1-win-x64
+          name: TorchlightHelper-1.2.2-win-x64
           path: release
       - name: Publish release after both test suites pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v1.2.1 >/dev/null 2>&1; then
-            gh release create v1.2.1 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.1 — OCR 개선" --notes-file RELEASE_NOTES.md
+          if ! gh release view v1.2.2 >/dev/null 2>&1; then
+            gh release create v1.2.2 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.2 — OCR 개선" --notes-file RELEASE_NOTES.md
           fi

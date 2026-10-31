@@ -8,7 +8,7 @@ pub struct Tooltip { pub rect: Rect, pub center: CardPosData, pub scale: f64 }
 pub struct CardPosData { pub x: f64, pub y: f64 }
 
 /// Find a connected bright card border only in the left tooltip area. No fixed screenshot hash or name.
-pub fn tooltip(img: &Img) -> Option<Tooltip> {
+fn connected_border(img: &Img) -> Option<Rect> {
     let (w,h)=(img.width*27/100,img.height*70/100);
     let y0=img.height/4;
     if w<2 || h<2 {return None;}
@@ -40,11 +40,81 @@ pub fn tooltip(img: &Img) -> Option<Tooltip> {
             if best.as_ref().is_none_or(|b|area>b.0) {best=Some((area,Rect::new(x0 as f64,(top+y0) as f64,ww,hh)));}
         }
     }
-    best.map(|(_,r)| {
-        let scale=(r.h-12.0*k)/340.0;
-        Tooltip {rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale}
-    })
+    best.map(|(_,r)|r)
 }
+
+#[derive(Clone,Debug,serde::Serialize)]
+pub struct TooltipSearch {
+    pub tooltip:Option<Tooltip>,pub method:Option<&'static str>,
+    pub blue_sides:usize,pub blue_pairs:usize,pub edge_score:f64,
+}
+
+/// Blue glow is broken by the background and need not form a connected component. Fit both long
+/// sides and independently verify top and bottom; lowering a global colour threshold joins scenery.
+pub fn inspect_tooltip(img:&Img)->TooltipSearch {
+    let k=img.height as f64/1440.0;
+    let make=|r:Rect|Tooltip{rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale:(r.h-12.0*k)/340.0};
+    if let Some(r)=connected_border(img) {return TooltipSearch{tooltip:Some(make(r)),method:Some("connected_border"),blue_sides:0,blue_pairs:0,edge_score:1.0};}
+    let (w,h,y0)=(img.width*27/100,img.height*70/100,img.height/4);
+    let mut result=TooltipSearch{tooltip:None,method:None,blue_sides:0,blue_pairs:0,edge_score:0.0};
+    if w<3 || h<3 {return result;}
+    let mut mask=vec![false;w*h];
+    for y in 0..h {for x in 0..w {
+        let (r,g,b)=img.px(x,y+y0);
+        mask[y*w+x]=b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25;
+    }}
+    let on=|x:usize,y:usize|(x.saturating_sub(1)..=(x+1).min(w-1)).any(|xx|mask[y*w+xx]);
+    let gap=(5.0*k).round().max(3.0) as usize;
+    let mut sides=Vec::new();
+    for x in 0..w {
+        let (mut start,mut last,mut hits)=(0,0,0usize);
+        let mut keep=|start:usize,last:usize,hits:usize| {
+            let height=(last-start+1) as f64;
+            if hits>0 && height>=260.0*k && height<=700.0*k && hits as f64/height>=0.85 {
+                sides.push((x,start+y0,last+y0,hits as f64/height));
+            }
+        };
+        for y in 0..h {
+            if !on(x,y) {continue;}
+            if hits==0 || y-last>gap {keep(start,last,hits);start=y;hits=0;}
+            last=y;hits+=1;
+        }
+        keep(start,last,hits);
+    }
+    result.blue_sides=sides.len();
+    if sides.len()>96 {return result;}
+    let horizontal=|left:usize,right:usize,lo:f64,hi:f64| {
+        let mut values=Vec::new();let mut best=0.0f64;
+        for y in (lo.floor().max(y0 as f64) as usize)..=(hi.ceil().min((y0+h-1) as f64) as usize) {
+            let at=y-y0;
+            let score=(0..40).filter(|i| {
+                let x=(left as f64+(right-left) as f64*(0.08+*i as f64/39.0*0.84)).round() as usize;
+                (at.saturating_sub(2)..=(at+2).min(h-1)).any(|yy|mask[yy*w+x])
+            }).count() as f64/40.0;
+            best=best.max(score);values.push((y as f64,score));
+        }
+        let near:Vec<_>=values.into_iter().filter(|(_,s)|*s>=best-0.025).collect();
+        let y=near.iter().map(|(y,_)|*y).sum::<f64>()/near.len().max(1) as f64;
+        (y,best)
+    };
+    let mut rank=0.0;
+    for (i,&(lx,lt,lb,ls)) in sides.iter().enumerate() {for &(rx,rt,rb,rs) in &sides[i+1..] {
+        let width=(rx-lx) as f64;
+        if width<180.0*k || width>500.0*k || lt.abs_diff(rt) as f64>200.0*k || lb.abs_diff(rb) as f64>200.0*k {continue;}
+        let (top,ts)=horizontal(lx,rx,lt.min(rt) as f64-12.0*k,lt.max(rt) as f64+12.0*k);
+        let (bottom,bs)=horizontal(lx,rx,lb.min(rb) as f64-12.0*k,lb.max(rb) as f64+12.0*k);
+        let height=bottom-top;
+        if height<260.0*k || height>700.0*k || !(0.5..0.85).contains(&(width/height))
+            || ((lb-lt+1).min(rb-rt+1) as f64)<height*0.6 {continue;}
+        result.blue_pairs+=1;result.edge_score=result.edge_score.max(ts.min(bs));
+        if ts>=0.7 && bs>=0.7 && ts+bs+ls+rs>rank {
+            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some("blue_edges");
+        }
+    }}
+    result
+}
+
+pub fn tooltip(img:&Img)->Option<Tooltip> {inspect_tooltip(img).tooltip}
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct HoverRead {pub name:String,pub text:String,pub title_score:f64,pub art_score:f64,pub tooltip:Tooltip}

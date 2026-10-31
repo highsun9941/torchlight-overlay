@@ -24,3 +24,5 @@ Additional modifications in 1.1.1: log-independent visual change detection, stal
 Additional modifications in 1.2.0: user-assisted enlarged-card OCR, blue unresolved-slot markers, persistent capture sessions, shape-based UI change detection, and bounded local diagnostic captures. No runtime package dependency added.
 
 Additional modifications in 1.2.1: verified tank-state change detection, glyph-row name colours, unique tooltip-to-slot routing without a foreground prerequisite, and regression inputs from user diagnostics. No new runtime dependency.
+
+1.2.2 fork modifications add disconnected blue tooltip edge fitting, stable hover change detection and regression fixtures; no third-party runtime dependencies are added.

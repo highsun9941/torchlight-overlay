@@ -6,7 +6,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / 'release' / 'TorchlightHelper-KO'
-ARCHIVE = ROOT / 'release' / 'TorchlightHelper-KO-1.2.1-win-x64.zip'
+ARCHIVE = ROOT / 'release' / 'TorchlightHelper-KO-1.2.2-win-x64.zip'
 BLOCKED = {'user-data', 'dataset', 'reports', 'qa'}
 
 def digest(path):

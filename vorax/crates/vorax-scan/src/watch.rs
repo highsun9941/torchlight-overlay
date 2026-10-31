@@ -28,8 +28,10 @@ impl Stamp {
         // Unused fan positions contain animated scenery on a three-card offer.
         let size = crate::cards::fan_size(img, &l);
         for (i, c) in l.hand_at(size).iter().enumerate() {
-            add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, hovered == Some(i));
-            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, hovered == Some(i));
+            // Enlarging one offer also slides its neighbours. Round, refreshes, validated tanks and
+            // the instrument panel still detect actual actions while this temporary fan motion is masked.
+            add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, tooltip.is_some() || hovered == Some(i));
+            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, tooltip.is_some() || hovered == Some(i));
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
         let count=crate::cards::cards_present(img,&l);
@@ -113,6 +115,7 @@ impl ScreenWatch {
         let mut stamp=Stamp::new(img,ui,self.hovered);
         if let Some(old)=&self.accepted {
             for a in &mut stamp.areas { if a.ignored { if let Some(b)=old.areas.iter().find(|b|b.name==a.name) {a.values=b.values.clone();} } }
+            for (new,before) in stamp.tanks.iter_mut().zip(&old.tanks) {if new.is_none() {*new=before.clone();}}
         }
         self.accepted=Some(stamp); self.pending=None;
     }

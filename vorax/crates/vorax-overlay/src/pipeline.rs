@@ -669,6 +669,92 @@ mod tests {
             let read=vorax_scan::hover::recognize(&frame,"instrument",&[],&mut text);
             assert!(matches!(&read,Ok(r) if r.name=="Adherent Metatarsals"),"{file}: {read:?}");
         }
+        for i in 0..3 {
+            let frame=blue_potion(i);let mut text=|img:&Img|ocr.read(img).unwrap();
+            let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text);
+            assert!(matches!(&read,Ok(r) if r.name=="Gray Matter Spinal Solution"),"blue potion {i}: {read:?}");
+        }
+    }
+
+    fn blue_potion(i:usize)->super::Img {
+        super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../fixtures/blue-tooltip/potion-{i}.png"))).unwrap()
+    }
+
+    // These strings are the captured ordinary-offer OCR, in order. The enlarged card is a separate
+    // OCR input; a correct response here tests the geometry and routing, not the OS OCR implementation.
+    fn blue_offer_ocr()->impl FnMut(&super::Img)->String {
+        let mut values=["식수 가루약","활성 적수 가루약\n변이 악마가 아","한성 배육 호르몬;",
+            "1 그룹 몬스터","랜엄\n활성 +41, 몬스터로","회벽한 적수 용역\n1 몬스터 41?\n한성 +41, 몬스터로"].into_iter();
+        move |_|values.next().unwrap_or("").to_string()
+    }
+
+    #[test]
+    fn broken_blue_borders_enter_ocr_and_only_complete_the_third_offer() {
+        use super::*;
+        let first=blue_potion(0);let mut pipe=Pipeline::new(0);let mut ordinary=blue_offer_ocr();
+        let result=pipe.run(&first,None,Some(&mut ordinary));
+        assert!(matches!(result,Outcome::Uncertain{..}),"reported third title needs assistance");
+        assert_eq!(pipe.requested_slots(),[2]);assert_eq!(pipe.hover_plan().unwrap().inspect.len(),1);
+        for i in 0..3 {
+            let frame=blue_potion(i);let search=vorax_scan::hover::inspect_tooltip(&frame);
+            let tip=search.tooltip.as_ref().unwrap_or_else(||panic!("blue {i}: {search:?}"));
+            assert_eq!(search.method,Some("blue_edges"));
+            assert!((tip.rect.x-44.0).abs()<10.0 && (tip.rect.y-418.0).abs()<10.0,"{search:?}");
+            assert!((tip.rect.w-220.0).abs()<12.0 && (tip.rect.h-328.0).abs()<12.0,"{search:?}");
+            let mut text=|_:&Img|"회백질 척수 용액".to_string();
+            let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text).unwrap();
+            assert_eq!(read.name,"Gray Matter Spinal Solution");assert!(read.art_score>=0.92);
+            if i<2 {
+                let candidates=pipe.requested_slots().into_iter().map(|slot|(slot,pipe.pending().unwrap().hand_ranks.as_ref().unwrap()[slot].clone())).collect::<Vec<_>>();
+                assert_eq!(vorax_scan::hover::target(&read.name,&candidates,None),Some(2));
+                assert_eq!(pipe.confirm_hover(2,&read,500.0+i as f64*500.0),i==1);
+            }
+        }
+        assert!(pipe.requested_slots().is_empty());let mut ordinary=blue_offer_ocr();
+        match pipe.run(&blue_potion(1),None,Some(&mut ordinary)) {
+            Outcome::Advice{reading,plan,..}=>{
+                assert_eq!(reading.state.hand,["Fresh Spinal Powder","Viviparous Hormone","Gray Matter Spinal Solution"]);
+                assert_eq!(reading.state.round,Some(2));assert_eq!(reading.state.potion_refreshes,Some(3));assert!(plan.pill.is_some());
+            },
+            Outcome::Uncertain{reading}=>panic!("hover must leave the loop: {}",serde_json::to_string(&reading).unwrap()),
+            _=>panic!("hover must lead to advice"),
+        }
+        assert!(vorax_scan::hover::tooltip(&reported("settings.png")).is_none());
+        assert!(vorax_scan::hover::tooltip(&reported("board-before.png")).is_none());
+    }
+
+    #[test]
+    fn blue_hover_reflow_and_red_heart_do_not_reset_assistance_but_real_counters_do() {
+        use super::*;
+        use vorax_scan::watch::{Change,ScreenWatch};
+        let mut watch=ScreenWatch::default();let first=blue_potion(0);watch.accept(&first,1.0);
+        for i in 0..9 {
+            let frame=blue_potion(i%3);let r=scan(&frame,scan_data(),true);
+            for j in 0..4 {
+                let m=r.state.tanks[j].as_ref().unwrap();
+                assert_eq!((m.archetype,m.rarity,m.activity,m.quantity),(vorax::types::Archetype::Pest,vorax::types::Rarity::Normal,45,36),"frame {i}: {}",serde_json::to_string(&r).unwrap());
+            }
+            assert_eq!(watch.observe(&frame,1.0,500.0+i as f64*500.0),Change::Unchanged,"hover reflows the whole fan: {:?}",watch.last_difference);
+            watch.accept(&frame,1.0);
+        }
+        let l=layout_at(first.width,first.height,1.0);
+        for band in [l.round,l.refresh,l.instrument_icon[0]] {
+            let mut changed=first.clone();
+            for y in band.y as usize..(band.y+band.h) as usize {for x in band.x as usize..(band.x+band.w) as usize {
+                let at=(y*changed.width+x)*4;changed.data[at..at+3].copy_from_slice(&[220,220,220]);
+            }}
+            assert!(watch.differs(&changed,1.0),"real counters/panel must invalidate advice while hovering");
+        }
+        // Keep the last verified watcher value across a momentarily occluded number, then recover
+        // without manufacturing a second change event solely because confidence returned.
+        let mut occluded=first.clone();let band=l.aq_band[1];
+        for y in (band.y-5.0) as usize..(band.y+band.h+12.0) as usize {for x in band.x as usize..(band.x+band.w) as usize {
+            let at=(y*occluded.width+x)*4;occluded.data[at..at+3].copy_from_slice(&[30,20,20]);
+        }}
+        watch.accept(&occluded,1.0);assert!(!watch.differs(&first,1.0));
+        let old=decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean/potion-round6-ultrawide.png")).unwrap();
+        let client=windowed_game(&old).map_or_else(||old.clone(),|r|crop_to(&old,&r));let r=scan(&client,scan_data(),true);
+        for i in [2,3] {assert_eq!(r.state.tanks[i].as_ref().unwrap().rarity,vorax::types::Rarity::Boss,"genuine red boss titles remain red");}
     }
 
 }

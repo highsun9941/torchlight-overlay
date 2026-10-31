@@ -4,7 +4,7 @@
 use crate::data::ScanData;
 use crate::layout::Layout;
 use crate::pixels::{Img, Rect};
-use crate::tanks::{read_tank, stats, TankRead};
+use crate::tanks::{read_tank, reconcile, stats, TankRead};
 use crate::text::{read_text, TextKind, TextRead};
 use indexmap::IndexMap;
 use std::sync::OnceLock;
@@ -31,7 +31,9 @@ pub fn tank(img: &Img, g: &[f32], l: &Layout, i: usize, data: &ScanData) -> Tank
         for inset in [0.0, 2.0 * l.k, 4.0 * l.k] {
             let aq = read_text(img, g, &shifted(l.aq_band[i], dy + inset), TextKind::Label, refs);
             let Some(aq) = aq.filter(|r| r.score >= 0.75) else { continue };
-            if !stats(Some(&total.text), Some(&aq.text)).2 { continue; }
+            // The heart can add a leading glyph (545×36). Apply the same independently checked
+            // reconciliation as read_tank before rejecting an otherwise clear shifted number pair.
+            if !stats(Some(&total.text), Some(&aq.text)).2 && reconcile(&total.alts,&aq.alts).is_none() { continue; }
             let mut at = l.clone();
             at.name_band[i].y += dy;
             at.total_band[i].y += dy;
