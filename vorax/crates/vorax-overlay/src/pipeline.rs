@@ -56,6 +56,11 @@ pub struct Pipeline {
     /// for its round, when the next board's can't be read)
     last: Option<(Reading, usize, usize)>,
     last_current: bool,
+    pending: Option<Reading>,
+    zoom_board: String,
+    zoom_names: std::collections::BTreeMap<usize, String>,
+    zoom_candidate: Option<(usize, String, f64)>,
+    zoom_dirty: bool,
     /// this game reached the Surgical Protocols (rounds 11-13): a board after them with no cards in hand is the game
     /// closing (its end animation, the rewards). Read as a board it gave six 1횞1 monsters in "round 1"; round 13's
     /// own board may not be read first (caught mid-animation, or its number read as 12)
@@ -83,13 +88,59 @@ pub fn shelley_rerolls(level: i32) -> i32 {
 
 impl Pipeline {
     pub fn new(shelley: i32) -> Pipeline {
-        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, protocols: false, resumed: false }
+        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, zoom_dirty: false, protocols: false, resumed: false }
     }
 
     pub fn ui(&self) -> f64 { self.last.as_ref().map_or(1.0, |(r, ..)| r.ui()) }
 
     /// Keep history for tracking rounds, but never re-display a plan after its screen changed.
     pub fn invalidate(&mut self) { self.last_current = false; }
+
+    pub fn pending(&self) -> Option<&Reading> { self.pending.as_ref() }
+    pub fn hover_dirty(&self) -> bool { self.zoom_dirty }
+    pub fn cancel_hover_candidate(&mut self) { self.zoom_candidate=None; }
+    pub fn reset_hover(&mut self) {
+        self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.zoom_candidate=None; self.zoom_dirty=false;
+    }
+    pub fn requested_slots(&self) -> Vec<usize> {
+        self.pending.as_ref().map_or_else(Vec::new, |r| r.blocking_fields().iter().filter_map(|f|f.strip_prefix("hand").and_then(|n|n.parse().ok())).collect())
+    }
+    pub fn hover_plan(&self) -> Option<Plan> {
+        let r=self.pending.as_ref()?;
+        let frame=r.frame.as_ref()?;
+        let l=layout_at(frame.width,frame.height,r.ui()).shifted_hand(r.hand_dy.unwrap_or(0.0));
+        let size=r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3),|h|h.len().max(3));
+        let mut plan=Plan::default();
+        for i in self.requested_slots() {if let Some(c)=l.hand_at(size).get(i) {plan.inspect.push((*c,230.0*l.k,340.0*l.k));}}
+        (!plan.inspect.is_empty()).then_some(plan)
+    }
+    pub fn confirm_hover(&mut self, slot:usize, read:&vorax_scan::hover::HoverRead, now:f64) -> bool {
+        if !self.requested_slots().contains(&slot) {return false;}
+        if self.zoom_candidate.as_ref().is_some_and(|(i,n,t)| *i==slot && n==&read.name && now-*t>=350.0 && now-*t<=2500.0) {
+            self.zoom_names.insert(slot,read.name.clone());self.zoom_candidate=None;self.zoom_dirty=true;
+            if let Some(r)=&mut self.pending {
+                let field=format!("hand{slot}");
+                r.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(read.name.clone()),score:Some(1.0),second:None});
+                r.problems.retain(|p|!matches!(p,Problem::UnknownArt{field:f,..} if f==&field));
+            }
+            true
+        } else {self.zoom_candidate=Some((slot,read.name.clone(),now));false}
+    }
+    fn apply_zoom(&mut self, reading:&mut Reading) {
+        let mut state=reading.state.clone(); state.hand.clear();state.shelley=None;
+        let key=serde_json::to_string(&state).unwrap_or_default();
+        if key!=self.zoom_board {self.zoom_board=key;self.zoom_names.clear();self.zoom_candidate=None;self.zoom_dirty=false;}
+        for (i,name) in &self.zoom_names {
+            let field=format!("hand{i}");
+            reading.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(name.clone()),score:Some(1.0),second:None});
+            reading.problems.retain(|p|!matches!(p,Problem::UnknownArt {field:f,..} if f==&field));
+        }
+        if !self.zoom_names.is_empty() {
+            let size=reading.hand_ranks.as_ref().map_or(reading.hand_size.unwrap_or(3),|h|h.len().max(3));
+            reading.state.hand=(0..size).filter_map(|i|reading.fields.get(&format!("hand{i}")).and_then(|f|f.guess.clone())).collect();
+        }
+        self.pending=Some(reading.clone());
+    }
 
     /// The board's instrument rerolls: as read on an instrument offer, else carried from the last one this game,
     /// else what the Shelley level starts a game with. (Upstream counts them as 0 on a potion board.)
@@ -142,7 +193,7 @@ impl Pipeline {
             None => frame.clone(),
         };
         // with a text reader: the cards by their printed names, by their pictures only where a name doesn't settle
-        let raw = match ocr {
+        let mut raw = match ocr {
             Some(read) => {
                 // A title shape is only authoritative when every offered card is independently
                 // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
@@ -182,6 +233,7 @@ impl Pipeline {
             return Outcome::Animating;
         }
         if raw.has(|p| matches!(p, Problem::NotFound)) {
+            self.reset_hover();
             return Outcome::NotGame;
         }
         // the screen opened again on the game under way (Escape and back skips long animations): what's known of it
@@ -226,6 +278,7 @@ impl Pipeline {
         self.align_card(&mut plan, &advice);
         self.last = Some((reading.clone(), img.width, img.height));
         self.last_current = true;
+        self.zoom_dirty = false;
         Outcome::Advice { reading: Box::new(reading), advice: Box::new(advice), plan, read_ms, cached }
     }
 
@@ -457,4 +510,40 @@ mod tests {
         // the overlay's first board
         assert!(!resumes(None, Some(6)));
     }
+    #[test]
+    fn enlarged_tooltip_is_located_and_wrong_card_association_is_rejected() {
+        use super::*;
+        let frame=decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/hover/instrument-tooltip.png")).unwrap();
+        let img=windowed_game(&frame).map_or_else(||frame.clone(),|r|crop_to(&frame,&r));
+        let tip=vorax_scan::hover::tooltip(&img).expect("the game renders a large card on the left");
+        assert!(tip.rect.x<img.width as f64*0.1 && tip.rect.h>img.height as f64*0.3);
+        let mut text=|_:&Img|"엉겨붙은 척골".to_string();
+        let read=vorax_scan::hover::recognize(&img,"instrument",&[("Adherent Metatarsals".into(),0.99)],&mut text).unwrap();
+        assert_eq!(read.name,"Adherent Metatarsals");
+        assert!(read.art_score>=0.92);
+        assert!(vorax_scan::hover::recognize(&img,"instrument",&[("Hypertrophic Pituitary".into(),0.99)],&mut text).is_err());
+        assert!(vorax_scan::hover::recognize(&Img::new(960,540),"instrument",&[],&mut text).is_err());
+    }
+
+    #[test]
+    fn hover_fills_only_the_requested_slot_after_two_observations_and_expires_on_board_change() {
+        use super::*;
+        let frame=decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean/potion-round6-ultrawide.png")).unwrap();
+        let img=windowed_game(&frame).map_or_else(||frame.clone(),|r|crop_to(&frame,&r));
+        let mut r=scan(&img,scan_data(),true);
+        r.fields.get_mut("hand0").unwrap().sure=false;
+        r.problems.push(Problem::UnknownArt {field:"hand0".into(),crop:layout_at(img.width,img.height,1.0).card_face[0],hand:None,text:None});
+        let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut r);
+        assert_eq!(pipe.requested_slots(),[0]);
+        let plan=pipe.hover_plan().unwrap();assert_eq!(plan.inspect.len(),1);assert!(plan.card.is_none());
+        let read=vorax_scan::hover::HoverRead{name:"Digestive Enzyme Solution".into(),text:"소화 효소 용액".into(),title_score:12.0,art_score:0.99,tooltip:vorax_scan::hover::Tooltip{rect:Default::default(),center:vorax_scan::hover::CardPosData{x:0.0,y:0.0},scale:1.0}};
+        assert!(!pipe.confirm_hover(1,&read,0.0));
+        assert!(!pipe.confirm_hover(0,&read,500.0));
+        assert!(pipe.confirm_hover(0,&read,1000.0));
+        pipe.apply_zoom(&mut r);
+        assert!(r.fields["hand0"].sure);assert!(pipe.requested_slots().is_empty());
+        assert_eq!(r.state.hand,["Digestive Enzyme Solution","Spinal Solution - Aemberon","Viscous Bile Solution"]);
+        r.state.round=Some(7);pipe.apply_zoom(&mut r);assert!(pipe.zoom_names.is_empty());
+    }
+
 }

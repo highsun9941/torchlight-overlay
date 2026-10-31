@@ -31,6 +31,8 @@ pub struct Plan {
     pub button: Option<Rect>,
     /// the glass of each tank to target
     pub tanks: Vec<Rect>,
+    /// Failed card slots, outlined in blue for user-assisted enlarged OCR.
+    pub inspect: Vec<(CardPos, f64, f64)>,
 }
 
 impl Plan {
@@ -42,6 +44,7 @@ impl Plan {
         p.card = None;
         p.button = None;
         p.tanks.clear();
+        p.inspect.clear();
         p
     }
 }
@@ -240,6 +243,12 @@ pub fn render(plan: &Plan, w: u32, h: u32, fonts: &Fonts, accent: (u8, u8, u8)) 
     // sizes follow the screen's height, as the game's UI does (1440p is 1)
     let s = (h as f32 / 1440.0).max(0.6);
 
+    for (c,cw,ch) in &plan.inspect {
+        let t=Transform::from_rotate(c.angle.to_degrees() as f32).post_translate(c.cx as f32,c.cy as f32);
+        if let Some(p)=rounded(-(*cw as f32)/2.0,-(*ch as f32)/2.0,*cw as f32,*ch as f32,12.0*s) {
+            glow(&mut pm,&p,t,s,(70,150,255));
+        }
+    }
     if let Some((c, cw, ch)) = plan.card {
         let t = Transform::from_rotate(c.angle.to_degrees() as f32).post_translate(c.cx as f32, c.cy as f32);
         let pad = 2.0 * s;

@@ -1,8 +1,9 @@
-//! Pictures of the game's window with Windows Graphics Capture: started only when a board needs reading, frames
-//! grabbed until two in a row look alike (the cards have landed), then stopped. The mouse is left out of the
-//! picture, and on Windows 11 no yellow border is drawn.
+//! One persistent Windows Graphics Capture session per game window. The OS controls its privacy border.
+//! Polling reuses the session; minimizing or closing the game releases it.
 
-use super::sys::Hwnd;
+use super::sys::{Hwnd, note};
+use std::cell::RefCell;
+use std::time::Instant;
 use vorax_scan::pixels::Img;
 use windows::core::Interface;
 use windows::Graphics::Capture::{Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession};
@@ -19,6 +20,15 @@ pub struct Capturer {
     device: ID3D11Device,
     context: ID3D11DeviceContext,
     rt_device: IDirect3DDevice,
+    active: RefCell<Option<Active>>,
+}
+
+struct Active {
+    hwnd: Hwnd,
+    session: Session,
+    size: windows::Graphics::SizeInt32,
+    last: Option<Img>,
+    at: Instant,
 }
 
 struct Session {
@@ -42,7 +52,7 @@ impl Capturer {
             let device: ID3D11Device = device.unwrap();
             let dxgi: IDXGIDevice = device.cast()?;
             let rt_device: IDirect3DDevice = CreateDirect3D11DeviceFromDXGIDevice(&dxgi)?.cast()?;
-            Ok(Capturer { device, context: context.unwrap(), rt_device })
+            Ok(Capturer { device, context: context.unwrap(), rt_device, active: RefCell::new(None) })
         }
     }
 
@@ -52,29 +62,10 @@ impl Capturer {
         let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&self.rt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, item.Size()?)?;
         let session = pool.CreateCaptureSession(&item)?;
         let _ = session.SetIsCursorCaptureEnabled(false);
-        let _ = session.SetIsBorderRequired(false);
+        let border = session.SetIsBorderRequired(false);
+        note(&format!("capture session start hwnd={:?}; borderless_request={:?}; Windows may retain its privacy border", hwnd, border));
         session.StartCapture()?;
         Ok(Session { pool, session })
-    }
-
-    /// The newest frame the session has, waiting up to `wait_ms` for one.
-    fn latest(&self, s: &Session, wait_ms: u64) -> windows::core::Result<Option<Img>> {
-        let t0 = std::time::Instant::now();
-        loop {
-            let mut newest = None;
-            while let Ok(f) = s.pool.TryGetNextFrame() {
-                newest = Some(f);
-            }
-            if let Some(frame) = newest {
-                let img = self.to_img(&frame)?;
-                let _ = frame.Close();
-                return Ok(Some(img));
-            }
-            if t0.elapsed().as_millis() as u64 >= wait_ms {
-                return Ok(None);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(8));
-        }
     }
 
     fn to_img(&self, frame: &windows::Graphics::Capture::Direct3D11CaptureFrame) -> windows::core::Result<Img> {
@@ -109,32 +100,81 @@ impl Capturer {
         }
     }
 
-    /// One picture now (as the hotkey asks).
+    /// Keep one capture session per game window. Reopening it for every poll flashes the Windows border.
     pub fn grab(&self, hwnd: Hwnd) -> windows::core::Result<Option<Img>> {
-        let s = self.start(hwnd)?;
-        Ok(self.latest(&s, 1000)?.map(|img| client_only(hwnd, img)))
+        if super::sys::client_rect(hwnd).is_none() { self.stop(); return Ok(None); }
+        let mut active = self.active.borrow_mut();
+        if active.as_ref().is_none_or(|a| a.hwnd != hwnd) {
+            let session = self.start(hwnd)?;
+            let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
+            let item: GraphicsCaptureItem = unsafe { interop.CreateForWindow(hwnd.get())? };
+            *active = Some(Active { hwnd, session, size: item.Size()?, last: None, at: Instant::now() });
+        }
+        let a = active.as_mut().unwrap();
+        // The pool only emits frames when the window changes. Reuse a recent frame for a static board.
+        let wait_ms=if a.last.is_some() {40} else {1000};
+        let result = self.latest_active(a,wait_ms);
+        match result {
+            Ok(Some(img)) => {
+                a.at = Instant::now();
+                a.last = Some(img.clone());
+                Ok(Some(img))
+            }
+            Ok(None) => Ok(a.last.clone()),
+            Err(e) => { *active = None; Err(e) }
+        }
     }
 
-    /// Pictures every 150 ms until two in a row look alike (the cards have stopped moving), at most 2.5 s.
-    pub fn grab_stable(&self, hwnd: Hwnd) -> windows::core::Result<Option<Img>> {
-        let s = self.start(hwnd)?;
-        let t0 = std::time::Instant::now();
-        let Some(mut frame) = self.latest(&s, 1000)? else { return Ok(None) };
-        let mut prev = thumb(&frame);
-        let mut still = 0;
-        while t0.elapsed().as_millis() < 2500 {
-            std::thread::sleep(std::time::Duration::from_millis(150));
-            let Some(f) = self.latest(&s, 500)? else { break };
-            let t = thumb(&f);
-            still = if frame_diff(&prev, &t) < 1.5 { still + 1 } else { 0 };
-            frame = f;
-            if still >= 2 {
-                break;
+    fn latest_active(&self, a: &mut Active, wait_ms: u64) -> windows::core::Result<Option<Img>> {
+        let start = Instant::now();
+        loop {
+            let mut newest:Option<windows::Graphics::Capture::Direct3D11CaptureFrame> = None;
+            while let Ok(f) = a.session.pool.TryGetNextFrame() { if let Some(old)=newest.replace(f) {let _=old.Close();} }
+            if let Some(frame) = newest {
+                let size = frame.ContentSize()?;
+                if size != a.size {
+                    let _ = frame.Close();
+                    a.session.pool.Recreate(&self.rt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size)?;
+                    note(&format!("capture pool resize {:?} -> {:?}", a.size, size));
+                    a.size = size;
+                    a.last = None;
+                    continue;
+                }
+                let img = self.to_img(&frame);
+                let _ = frame.Close();
+                return img.map(|img| Some(client_only(a.hwnd, img)));
             }
-            prev = t;
+            if start.elapsed().as_millis() >= wait_ms as u128 { return Ok(None); }
+            std::thread::sleep(std::time::Duration::from_millis(8));
         }
-        Ok(Some(client_only(hwnd, frame)))
     }
+
+    pub fn state(&self)->serde_json::Value {
+        self.active.borrow().as_ref().map_or(serde_json::json!({"active":false}),|a|serde_json::json!({"active":true,"hwnd":a.hwnd.0,"size":[a.size.Width,a.size.Height],"lastFrameAgeMs":a.at.elapsed().as_millis()}))
+    }
+
+    pub fn stop(&self) {
+        if self.active.borrow_mut().take().is_some() { note("capture session stopped"); }
+    }
+
+    /// Stabilize the static UI, not moving monsters or flames elsewhere in the window.
+    pub fn grab_stable(&self, hwnd: Hwnd) -> windows::core::Result<Option<Img>> {
+        let Some(mut frame) = self.grab(hwnd)? else { return Ok(None) };
+        let mut watch = vorax_scan::watch::ScreenWatch::default();
+        watch.accept(&frame, 1.0);
+        let start = Instant::now();
+        let mut still = 0;
+        while start.elapsed().as_millis() < 1500 {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            let Some(next) = self.grab(hwnd)? else { return Ok(None) };
+            still = if watch.differs(&next, 1.0) { 0 } else { still + 1 };
+            frame = next;
+            watch.accept(&frame, 1.0);
+            if still >= 2 { break; }
+        }
+        Ok(Some(frame))
+    }
+
 }
 
 /// The game's picture alone: a window capture also holds its title bar and borders (even ones off screen), so
@@ -153,35 +193,4 @@ fn client_only(hwnd: Hwnd, img: Img) -> Img {
         return img;
     }
     vorax_scan::window::crop_to(&img, &vorax_scan::pixels::Rect::new(dx as f64, dy as f64, cw as f64, ch as f64))
-}
-
-/// A 96-pixel-wide grey thumbnail (src/solver/live/stable.ts): bubbles and flames barely move it, a dealt hand does.
-fn thumb(img: &Img) -> (usize, Vec<f32>) {
-    let w = 96usize;
-    let h = ((img.height * w) as f64 / img.width as f64).round().max(1.0) as usize;
-    let mut g = vec![0f32; w * h];
-    let mut n = vec![0f32; w * h];
-    let (sx, sy) = (w as f64 / img.width as f64, h as f64 / img.height as f64);
-    // every 2nd pixel is plenty for a likeness test
-    for y in (0..img.height).step_by(2) {
-        let row = ((y as f64 * sy) as usize).min(h - 1) * w;
-        for x in (0..img.width).step_by(2) {
-            let i = (y * img.width + x) * 4;
-            let t = row + ((x as f64 * sx) as usize).min(w - 1);
-            g[t] += 0.299 * img.data[i] as f32 + 0.587 * img.data[i + 1] as f32 + 0.114 * img.data[i + 2] as f32;
-            n[t] += 1.0;
-        }
-    }
-    for i in 0..g.len() {
-        g[i] /= n[i].max(1.0);
-    }
-    (h, g)
-}
-
-/// Mean absolute grey difference, 0-255.
-fn frame_diff(a: &(usize, Vec<f32>), b: &(usize, Vec<f32>)) -> f32 {
-    if a.1.len() != b.1.len() {
-        return 255.0;
-    }
-    a.1.iter().zip(&b.1).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.1.len() as f32
 }

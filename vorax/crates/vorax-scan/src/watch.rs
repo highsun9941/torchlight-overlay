@@ -1,99 +1,115 @@
-//! Cheap visual change detection, independent of the game's log. Only static UI areas are sampled;
-//! flames and moving monsters do not keep restarting OCR. Time is supplied by the caller for replay tests.
+//! Compare named UI regions by shape, with hover motion and the left-hand tooltip excluded.
 use crate::layout::{card_face, layout_at};
 use crate::pixels::{Img, Rect};
 
 #[derive(Clone)]
-struct Stamp {
-    size: (usize, usize),
-    ui: f64,
-    areas: Vec<Vec<f32>>,
-}
+struct Area { name: String, values: Vec<f32>, ignored: bool }
+#[derive(Clone)]
+struct Stamp { size: (usize, usize), ui: f64, present: usize, areas: Vec<Area> }
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Difference { pub area: String, pub similarity: f64, pub mean_delta: f64 }
 
 impl Stamp {
-    fn new(img: &Img, ui: f64) -> Self {
+    fn new(img: &Img, ui: f64, hovered: Option<usize>) -> Self {
         let l = layout_at(img.width, img.height, ui);
-        let mut areas = vec![l.round, l.refresh];
-        areas.extend(l.cards.iter().map(|c| card_face(c, l.k)));
-        areas.extend([card_face(&l.hand5[0], l.k), card_face(&l.hand5[4], l.k)]);
-        // Identical potion art can hide a changed class suffix. Observe headings separately too.
-        areas.extend(l.cards.iter().chain(&l.hand5).map(|c| Rect::new(c.cx - 108.0 * l.k, c.cy - 38.0 * l.k, 216.0 * l.k, 44.0 * l.k)));
-        areas.extend(l.total_band);
-        areas.extend(l.aq_band);
-        areas.extend(l.name_band);
-        areas.extend(l.icon);
-        areas.extend(l.instrument_icon);
-        Self { size: (img.width, img.height), ui, areas: areas.iter().map(|r| sample(img, r)).collect() }
-    }
-
-    fn differs(&self, other: &Self, threshold: f32) -> bool {
-        self.size != other.size || self.ui != other.ui || self.areas.iter().zip(&other.areas).any(|(a, b)| {
-            let (sum, changed) = a.iter().zip(b).fold((0.0, 0usize), |(sum, count), (x, y)| {
-                let delta = (x - y).abs();
-                (sum + delta, count + usize::from(delta > 24.0))
-            });
-            sum / a.len() as f32 > threshold || changed * 100 > a.len()
-        })
-    }
-}
-
-/// Small colour thumbnails retain a changed digit or swapped potion without scanning full images.
-fn sample(img: &Img, r: &Rect) -> Vec<f32> {
-    let mut out = Vec::with_capacity(48 * 16 * 3);
-    for y in 0..16 {
-        for x in 0..48 {
-            let mut rgb = [0.0; 3];
-            for (dx, dy) in [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)] {
-                let xx = (r.x + (x as f64 + dx) * r.w / 48.0).max(0.0).min(img.width.saturating_sub(1) as f64) as usize;
-                let yy = (r.y + (y as f64 + dy) * r.h / 16.0).max(0.0).min(img.height.saturating_sub(1) as f64) as usize;
-                let (rr, gg, bb) = img.px(xx, yy);
-                for (v, c) in rgb.iter_mut().zip([rr, gg, bb]) { *v += c as f32 / 4.0; }
-            }
-            out.extend(rgb);
+        let tooltip=hovered.and_then(|_|crate::hover::tooltip(img)).map(|t|t.rect);
+        let mut areas = Vec::new();
+        let mut add = |name: String, r: Rect, text: bool, ignored: bool| {
+            let covered=tooltip.is_some_and(|t|r.x<t.x+t.w && r.x+r.w>t.x && r.y<t.y+t.h && r.y+r.h>t.y);
+            areas.push(Area { name, values: sample(img, &r, text), ignored:ignored||covered });
+        };
+        add("round".into(), l.round, true, false);
+        add("refreshes".into(), l.refresh, true, false);
+        // Unused fan positions contain animated scenery on a three-card offer.
+        let size = crate::cards::fan_size(img, &l);
+        for (i, c) in l.hand_at(size).iter().enumerate() {
+            add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, hovered == Some(i));
+            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, hovered == Some(i));
         }
+        for i in 0..6 {
+            add(format!("tank{i}.total"), l.total_band[i], true, false);
+            add(format!("tank{i}.quantity"), l.aq_band[i], true, false);
+            add(format!("tank{i}.name"), l.name_band[i], true, false);
+            add(format!("tank{i}.icon"), l.icon[i], true, false);
+        }
+        for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
+        let count=crate::cards::cards_present(img,&l);
+        let present=if count<3 && hovered.is_some() && tooltip.is_some() {3} else {count};
+        Self { size:(img.width,img.height),ui,present,areas }
     }
-    out
+    fn differences(&self, other: &Self) -> Vec<Difference> {
+        if self.size != other.size || self.ui != other.ui || self.areas.len()!=other.areas.len() {
+            return vec![Difference { area:"capture.size_or_layout".into(),similarity:0.0,mean_delta:255.0 }];
+        }
+        if self.present!=other.present {return vec![Difference{area:"hand.animation".into(),similarity:0.0,mean_delta:255.0}];}
+        self.areas.iter().zip(&other.areas).filter(|(_,b)| !b.ignored).filter_map(|(a,b)| {
+            let delta=a.values.iter().zip(&b.values).map(|(x,y)|(x-y).abs() as f64).sum::<f64>()/a.values.len() as f64;
+            let similarity=correlation(&a.values,&b.values);
+            (similarity < 0.90 && delta > if b.name.starts_with("tank") || b.name=="round" || b.name=="refreshes" {0.8} else {3.0}).then(|| Difference {area:b.name.clone(),similarity,mean_delta:delta})
+        }).collect()
+    }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+fn correlation(a: &[f32], b: &[f32]) -> f64 {
+    let mut best = -1.0f64;
+    for (dx,dy) in [(0,0),(-1,0),(1,0),(0,-1),(0,1)] {
+        let mut aa=0.0; let mut bb=0.0; let mut ab=0.0; let mut sa=0.0; let mut sb=0.0; let mut n=0.0;
+        for y in 1..15 { for x in 1..47 { for c in 0..3 {
+            let av=a[(y*48+x)*3+c] as f64;
+            let bv=b[(((y as i32+dy) as usize)*48+(x as i32+dx) as usize)*3+c] as f64;
+            sa+=av; sb+=bv; aa+=av*av; bb+=bv*bv; ab+=av*bv; n+=1.0;
+        }}}
+        let va=(aa-sa*sa/n).max(0.0); let vb=(bb-sb*sb/n).max(0.0);
+        let score=if va*vb>1e-6 {(ab-sa*sb/n)/(va*vb).sqrt()} else if va<1e-6 && vb<1e-6 && (sa-sb).abs()/n<8.0 {1.0} else {0.0};
+        best=best.max(score);
+    }
+    best.clamp(-1.0,1.0)
+}
+
+fn sample(img:&Img,r:&Rect,text:bool)->Vec<f32> {
+    let mut out=Vec::with_capacity(48*16*3);
+    for y in 0..16 { for x in 0..48 {
+        let mut rgb=[0.0;3];
+        for (dx,dy) in [(0.25,0.25),(0.75,0.25),(0.25,0.75),(0.75,0.75)] {
+            let xx=(r.x+(x as f64+dx)*r.w/48.0).clamp(0.0,img.width.saturating_sub(1) as f64) as usize;
+            let yy=(r.y+(y as f64+dy)*r.h/16.0).clamp(0.0,img.height.saturating_sub(1) as f64) as usize;
+            let (rr,gg,bb)=img.px(xx,yy);
+            let ink=rr.max(gg).max(bb)>80 && !(rr as i32>gg as i32+60 && rr as i32>bb as i32+50);
+            for (v,c) in rgb.iter_mut().zip([rr,gg,bb]) { *v+=if text && !ink {0.0} else {c as f32/4.0}; }
+        }
+        out.extend(rgb);
+    }} out
+}
+
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum Change { Unchanged, Changed, Waiting, Ready }
-
 #[derive(Default)]
-pub struct ScreenWatch {
-    accepted: Option<Stamp>,
-    pending: Option<(Stamp, f64)>,
-}
-
+pub struct ScreenWatch { accepted:Option<Stamp>, pending:Option<(Stamp,f64)>, hovered:Option<usize>, pub last_difference:Vec<Difference> }
 impl ScreenWatch {
-    /// Hide old advice on Changed; read on Ready, after at least two stable observations 350 ms apart.
-    pub fn observe(&mut self, img: &Img, ui: f64, now_ms: f64) -> Change {
-        let stamp = Stamp::new(img, ui);
-        if let Some((previous, since)) = &mut self.pending {
-            if previous.differs(&stamp, 1.5) { *previous = stamp; *since = now_ms; }
-            return if now_ms - *since >= 350.0 { Change::Ready } else { Change::Waiting };
+    pub fn set_hover(&mut self, slot:Option<usize>) { self.hovered=slot; }
+    pub fn observe(&mut self,img:&Img,ui:f64,now_ms:f64)->Change {
+        let stamp=Stamp::new(img,ui,self.hovered);
+        if let Some((before,since))=&mut self.pending {
+            let diff=before.differences(&stamp);
+            if !diff.is_empty() { *before=stamp; *since=now_ms; self.last_difference=diff; }
+            return if now_ms-*since>=350.0 {Change::Ready} else {Change::Waiting};
         }
-        if self.accepted.as_ref().is_none_or(|s| s.differs(&stamp, 3.0)) {
-            self.pending = Some((stamp, now_ms));
-            Change::Changed
-        } else { Change::Unchanged }
+        let diff=self.accepted.as_ref().map_or_else(||vec![Difference {area:"first-frame".into(),similarity:0.0,mean_delta:255.0}],|s|s.differences(&stamp));
+        if diff.is_empty() {Change::Unchanged} else {self.last_difference=diff;self.pending=Some((stamp,now_ms));Change::Changed}
     }
-
-    /// Remember the exact frame read, including failed reads, so an unchanged failure cannot spin OCR.
-    pub fn accept(&mut self, img: &Img, ui: f64) {
-        self.accepted = Some(Stamp::new(img, ui));
-        self.pending = None;
+    pub fn accept(&mut self,img:&Img,ui:f64) {
+        let mut stamp=Stamp::new(img,ui,self.hovered);
+        if let Some(old)=&self.accepted {
+            for a in &mut stamp.areas { if a.ignored { if let Some(b)=old.areas.iter().find(|b|b.name==a.name) {a.values=b.values.clone();} } }
+        }
+        self.accepted=Some(stamp); self.pending=None;
     }
-
-    /// A final capture before publishing advice catches a selection made while OCR was running.
-    pub fn differs(&self, img: &Img, ui: f64) -> bool {
-        self.accepted.as_ref().is_none_or(|s| s.differs(&Stamp::new(img, ui), 3.0))
+    pub fn compare(&self,img:&Img,ui:f64)->Vec<Difference> {
+        self.accepted.as_ref().map_or_else(||vec![Difference {area:"no-reference".into(),similarity:0.0,mean_delta:255.0}],|s|s.differences(&Stamp::new(img,ui,self.hovered)))
     }
-
-    pub fn reset(&mut self) -> bool {
-        let had_frame = self.accepted.is_some() || self.pending.is_some();
-        *self = Self::default();
-        had_frame
-    }
+    pub fn differs(&self,img:&Img,ui:f64)->bool { !self.compare(img,ui).is_empty() }
+    pub fn reset(&mut self)->bool {let had=self.accepted.is_some()||self.pending.is_some();*self=Self::default();had}
 }
 
 #[cfg(test)]
@@ -163,4 +179,19 @@ mod tests {
         watch.accept(&a, 1.0);
         assert_eq!(watch.observe(&noise, 1.0, 1000.0), Change::Unchanged);
     }
+    #[test]
+    fn unused_fan_positions_and_hovered_cards_do_not_restart_ocr() {
+        let a=Img::new(960,540);let l=layout_at(960,540,1.0);
+        let mut scene=a.clone();
+        fill(&mut scene,Rect::new(l.hand5[0].cx-30.0,370.0,50.0,90.0),180);
+        let mut watch=ScreenWatch::default();watch.accept(&a,1.0);
+        assert_eq!(watch.observe(&scene,1.0,500.0),Change::Unchanged);
+        let mut hover=a.clone();fill(&mut hover,l.card_face[1],180);
+        watch.set_hover(Some(1));
+        assert_eq!(watch.observe(&hover,1.0,1000.0),Change::Unchanged);
+        assert!(!watch.differs(&hover,1.0),"a hover animation cannot veto completed OCR");
+        watch.accept(&hover,1.0);watch.set_hover(None);
+        assert_eq!(watch.observe(&a,1.0,1500.0),Change::Unchanged,"keep the normal card reference while hovered");
+    }
+
 }

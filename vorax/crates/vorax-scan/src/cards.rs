@@ -154,6 +154,10 @@ fn rank(img: &Img, c: &CardPos, k: f64, prefix: &str, data: &ScanData, use_text:
     out
 }
 
+pub fn rank_card_art(img: &Img, c: &CardPos, k: f64, phase: &str, data: &ScanData) -> Vec<(String, f64)> {
+    rank(img, c, k, &format!("{phase}:"), data, false)
+}
+
 pub struct SlotsRead {
     pub names: Vec<String>,
     pub fields: Fields,
