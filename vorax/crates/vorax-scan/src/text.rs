@@ -324,10 +324,16 @@ pub struct TextRead {
 pub fn round_ocr_crop(img: &Img, l: &crate::layout::Layout) -> Img {
     let mut r = l.round;
     r.w *= 1.8;
+    r.h *= 1.15;
     let mut p = crate::pixels::crop(img, r);
+    let peak=p.data.chunks_exact(4).filter(|px|px[0]>px[2].saturating_add(15) && px[0]>=px[1] && px[1]>=px[2])
+        .map(|px|lum(px[0],px[1],px[2])).fold(0.0f64,f64::max);
+    // The /13 suffix is grey and substantially darker than the gold numerator. A fixed
+    // brightness cutoff erased it, leaving an isolated digit that Windows OCR often omitted.
+    let threshold=(peak*0.45).max(25.0);
     for px in p.data.chunks_exact_mut(4) {
         let (_, s, v) = hsv(px[0], px[1], px[2]);
-        let ink = (s > 0.2 && v > 0.45 && px[0] >= px[1] && px[1] >= px[2]) || (s < 0.25 && v > 0.4);
+        let ink = lum(px[0],px[1],px[2])>threshold && ((s>0.2 && v>0.2 && px[0]>=px[1] && px[1]>=px[2]) || s<0.28);
         px.copy_from_slice(&[if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, 255]);
     }
     let p = crate::pixels::resize(&p, p.width * 3, p.height * 3);

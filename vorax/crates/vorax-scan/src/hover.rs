@@ -55,13 +55,25 @@ pub fn inspect_tooltip(img:&Img)->TooltipSearch {
     let k=img.height as f64/1440.0;
     let make=|r:Rect|Tooltip{rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale:(r.h-12.0*k)/340.0};
     if let Some(r)=connected_border(img) {return TooltipSearch{tooltip:Some(make(r)),method:Some("connected_border"),blue_sides:0,blue_pairs:0,edge_score:1.0};}
+    let blue=fit_edges(img,false);
+    if blue.tooltip.is_some() {return blue;}
+    let neutral=fit_edges(img,true);
+    if neutral.tooltip.is_some() {neutral} else {blue}
+}
+
+/// Normal potions have a dim grey frame. Fit all four edges independently, using the same
+/// size/aspect checks as the blue frame; scenery colour alone never identifies a card.
+fn fit_edges(img:&Img,neutral:bool)->TooltipSearch {
+    let k=img.height as f64/1440.0;
+    let make=|r:Rect|Tooltip{rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale:(r.h-12.0*k)/340.0};
     let (w,h,y0)=(img.width*27/100,img.height*70/100,img.height/4);
     let mut result=TooltipSearch{tooltip:None,method:None,blue_sides:0,blue_pairs:0,edge_score:0.0};
     if w<3 || h<3 {return result;}
     let mut mask=vec![false;w*h];
     for y in 0..h {for x in 0..w {
         let (r,g,b)=img.px(x,y+y0);
-        mask[y*w+x]=b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25;
+        mask[y*w+x]=if neutral {r.min(g).min(b)>=60 && r.max(g).max(b)-r.min(g).min(b)<=48}
+            else {b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25};
     }}
     let on=|x:usize,y:usize|(x.saturating_sub(1)..=(x+1).min(w-1)).any(|xx|mask[y*w+xx]);
     let gap=(5.0*k).round().max(3.0) as usize;
@@ -108,7 +120,7 @@ pub fn inspect_tooltip(img:&Img)->TooltipSearch {
             || ((lb-lt+1).min(rb-rt+1) as f64)<height*0.6 {continue;}
         result.blue_pairs+=1;result.edge_score=result.edge_score.max(ts.min(bs));
         if ts>=0.7 && bs>=0.7 && ts+bs+ls+rs>rank {
-            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some("blue_edges");
+            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some(if neutral {"neutral_edges"} else {"blue_edges"});
         }
     }}
     result
