@@ -25,7 +25,6 @@ jobs:
     env:
       CARGO_HOME: ${{ github.workspace }}/.toolchain/cargo
       NUGET_PACKAGES: ${{ github.workspace }}/.nuget
-      VORAX_LANGUAGE: ko
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
@@ -38,6 +37,9 @@ jobs:
       - name: Build portable Windows helper
         run: ./build.ps1
       - name: Verify production reader on Korean screenshots
+        env:
+          VORAX_LANGUAGE: ko
+          VORAX_OCR_MODE: accurate
         shell: pwsh
         run: |
           foreach ($image in Get-ChildItem vorax/fixtures/korean/*.png) {

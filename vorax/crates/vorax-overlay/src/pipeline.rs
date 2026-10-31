@@ -136,16 +136,29 @@ impl Pipeline {
         // with a text reader: the cards by their printed names, by their pictures only where a name doesn't settle
         let raw = match ocr {
             Some(read) => {
-                let names = scan(&img, data, false);
-                let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
-                let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
-                let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
-                if named.state.hand.is_empty() || named.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. })) {
+                // A title shape is only authoritative when every offered card is independently
+                // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
+                let localized = if std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko") {
                     let pictured = scan(&img, data, true);
-                    if !pictured.state.hand.is_empty() && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating)) {
-                        pictured
+                    let verified = !pictured.state.hand.is_empty()
+                        && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating))
+                        && pictured.state.hand.iter().enumerate().all(|(i, _)| {
+                        pictured.fields.get(&format!("hand{i}")).is_some_and(|f| f.sure && f.second.is_none() && f.score.is_some_and(|s| s >= 0.94))
+                    });
+                    verified.then_some(pictured)
+                } else { None };
+                if let Some(pictured) = localized { pictured } else {
+                    let names = scan(&img, data, false);
+                    let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
+                    let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
+                    let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
+                    if named.state.hand.is_empty() || named.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. })) {
+                        let pictured = scan(&img, data, true);
+                        if !pictured.state.hand.is_empty() && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating)) {
+                            pictured
+                        } else { named }
                     } else { named }
-                } else { named }
+                }
             }
             None => scan(&img, data, true),
         };
@@ -359,6 +372,21 @@ mod tests {
                 _ => panic!("{file}: expected a complete board"),
             }
         }
+    }
+
+    #[test]
+    fn verified_korean_titles_are_not_replaced_by_conflicting_os_ocr() {
+        use super::*;
+        let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean/potion-round4-ultrawide.png")).unwrap();
+        let mut calls = 0;
+        let mut text = |_: &Img| { calls += 1; "부화낭".to_string() };
+        let mut pipeline = Pipeline::new(0);
+        let result = pipeline.run(&frame, None, Some(&mut text));
+        match result {
+            Outcome::Advice { reading, .. } => assert_eq!(reading.state.hand, ["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"]),
+            _ => panic!("expected the verified Korean offer"),
+        }
+        assert_eq!(calls, 0);
     }
 
     #[test]
