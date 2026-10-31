@@ -75,3 +75,20 @@ pub fn windowed_game(img: &Img) -> Option<Rect> {
     let top = end + 1 + start;
     Some(Rect::new(start as f64, top as f64, (img.width - 2 * start) as f64, (img.height - top - start) as f64))
 }
+
+/// Production captures may contain a yellow privacy outline painted over the thin window edge.
+/// Its three coloured rows are not a three/four-pixel DPI border. Preserve the recorded upstream
+/// crop above, but locate the actual client start immediately below the white title bar here.
+pub fn game_view(img:&Img)->Option<Rect> {
+    let old=windowed_game(img)?;
+    let yellow=|x:usize,y:usize| {
+        let (r,g,b)=img.px(x,y);r>180 && g>150 && b<120 && r>=g && r-g<80
+    };
+    let line=|y:usize|(0..64).filter(|i|yellow(4+*i*(img.width-8)/64,y)).count();
+    let top=(1..=4).any(|y|line(y)>=56);
+    let bottom=(1..=4).any(|y|line(img.height-1-y)>=56);
+    if top && bottom {
+        let y=old.y-old.x;
+        Some(Rect::new(1.0,y,(img.width-2) as f64,img.height as f64-y-1.0))
+    } else {Some(old)}
+}

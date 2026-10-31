@@ -418,7 +418,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
                 advice.ms,
                 serde_json::to_string(&reading.state).unwrap_or_default()
             ));
-            let (w, h) = vorax_scan::window::windowed_game(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
+            let (w, h) = vorax_scan::window::game_view(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
             send(ToUi::Show(plan, w, h));
         }
         // the board changed and a card is still moving: the marks stay hidden (the pill dimmed) while it looks again,

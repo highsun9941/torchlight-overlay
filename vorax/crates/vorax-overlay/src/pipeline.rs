@@ -11,7 +11,7 @@ use vorax_scan::titles::pictures_adaptive as pictures;
 #[cfg(test)]
 use vorax_scan::titles::read_titles;
 use vorax_scan::track::{track_instruments, InstrumentTracker};
-use vorax_scan::window::{crop_to, windowed_game};
+use vorax_scan::window::{crop_to, game_view as windowed_game};
 use vorax_scan::{scan, scan_data};
 
 pub type TextReader<'a> = Option<&'a mut dyn FnMut(&Img) -> String>;
@@ -698,7 +698,8 @@ mod tests {
         use super::*;
         let mut areas=Vec::new();let mut centers=Vec::new();
         for file in ["hover.png","rest.png"] {
-            let frame=title_motion(file);let l=layout_at(frame.width,frame.height,1.0);let mut row=Vec::new();
+            let frame=title_motion(file);assert_eq!((frame.width,frame.height),(1860,928),"privacy outline is not a wide window border");
+            let l=layout_at(frame.width,frame.height,1.0);let mut row=Vec::new();
             for (slot,c) in l.cards.iter().enumerate() {
                 let (img,area)=vorax_scan::titles::located_heading(&frame,c,l.k,false);
                 assert_eq!((img.width,img.height),(464,120));
@@ -765,7 +766,7 @@ mod tests {
         let result=pipe.run(&first,None,Some(&mut text));
         assert!(matches!(result,Outcome::Uncertain{..}));assert_eq!(pipe.requested_slots(),[1]);
         let mut watch=ScreenWatch::default();watch.accept(&first,1.0);watch.set_hover(Some(1));
-        assert_eq!(watch.observe(&popup,1.0,500.0),Change::Unchanged);
+        assert_eq!(watch.observe(&popup,1.0,500.0),Change::Unchanged,"hover areas: {:?}",watch.last_difference);
         let capture=title_motion("tooltip.png");let texts:Vec<String>=serde_json::from_str(include_str!("../../../fixtures/title-motion/ocr.json")).unwrap();
         let mut iter=texts.into_iter();let mut text=|_:&Img|iter.next().unwrap_or_default();
         let read=vorax_scan::hover::recognize(&capture,"potion",&[],&mut text).unwrap();

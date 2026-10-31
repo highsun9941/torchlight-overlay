@@ -190,7 +190,7 @@ pub fn run(args: &[String]) {
 fn inspect_frame(input: &std::path::Path, out: &std::path::Path) {
     unsafe { let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED); }
     let frame = crate::pipeline::decode_png(input).expect("read diagnostic screenshot");
-    let img = vorax_scan::window::windowed_game(&frame).map_or_else(|| frame.clone(), |r| vorax_scan::window::crop_to(&frame, &r));
+    let img = vorax_scan::window::game_view(&frame).map_or_else(|| frame.clone(), |r| vorax_scan::window::crop_to(&frame, &r));
     std::fs::create_dir_all(out).expect("create diagnostic directory");
     let _ = crate::pipeline::encode_png(&out.join("client.png"), img.width as u32, img.height as u32, &img.data);
     let ocr = ocr::Ocr::new().ok();
