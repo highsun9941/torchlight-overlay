@@ -28,7 +28,8 @@ public partial class ControlWindow
         VoraxCpuCombo.Items.Add($"게임 우선 / {CpuThreads(0)}개 스레드");
         VoraxCpuCombo.Items.Add($"균형 / {CpuThreads(1)}개 스레드");
         VoraxCpuCombo.Items.Add($"추천 속도 우선 / {CpuThreads(2)}개 스레드");
-        VoraxCpuCombo.SelectedIndex = Math.Clamp(_settings.VoraxCpuMode, 0, 2);
+        VoraxCpuCombo.Items.Add($"최대 성능 / {CpuThreads(3)}개 스레드 + 정밀 OCR");
+        VoraxCpuCombo.SelectedIndex = Math.Clamp(_settings.VoraxCpuMode, 0, 3);
         _settings.VoraxThreads = CpuThreads(VoraxCpuCombo.SelectedIndex);
         AutoContentCheck.IsChecked = _settings.AutoDetectContent;
         _companionTimer.Tick += (_, _) => { UpdateAutomaticContent(); ReadVoraxStatus(); };
@@ -139,7 +140,7 @@ public partial class ControlWindow
         _settings.GameLanguage = LanguageCombo.SelectedIndex == 1 ? "en" : "ko";
         _settings.ShelleyLevel = ShelleyCombo.SelectedIndex;
         _settings.VoraxFutures = new[] { 256, 512, 1024 }[Math.Clamp(VoraxQualityCombo.SelectedIndex, 0, 2)];
-        _settings.VoraxCpuMode = Math.Clamp(VoraxCpuCombo.SelectedIndex, 0, 2);
+        _settings.VoraxCpuMode = Math.Clamp(VoraxCpuCombo.SelectedIndex, 0, 3);
         _settings.VoraxThreads = CpuThreads(_settings.VoraxCpuMode);
         _settings.Save();
         CheckGameLanguage();
@@ -154,6 +155,7 @@ public partial class ControlWindow
     {
         0 => Math.Clamp(Environment.ProcessorCount / 4, 1, 4),
         2 => Math.Clamp(Environment.ProcessorCount * 3 / 4, 1, 12),
+        3 => Math.Max(Environment.ProcessorCount, 1),
         _ => Math.Clamp(Environment.ProcessorCount / 2, 1, 8)
     };
 
@@ -182,6 +184,7 @@ public partial class ControlWindow
             }
             start.Environment["VORAX_DATA_DIR"] = VoraxData;
             start.Environment["VORAX_LANGUAGE"] = _settings.GameLanguage ?? "ko";
+            start.Environment["VORAX_OCR_MODE"] = _settings.VoraxCpuMode == 3 ? "accurate" : "balanced";
             start.Environment["VORAX_FUTURES"] = _settings.VoraxFutures.ToString();
             start.Environment["RAYON_NUM_THREADS"] = Math.Clamp(_settings.VoraxThreads, 1, Environment.ProcessorCount).ToString();
             _vorax?.Dispose();

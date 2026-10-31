@@ -111,12 +111,17 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
         let h = header_only(img, &l, data);
         crate::cards::HandRead { ranks: Some(vec![]), ..h }
     } else if pictures {
-        read_hand(img, &l, data)
+        if upstream { read_hand(img, &l, data) }
+        else { crate::cards::read_hand_adaptive(img, &l, data) }
     } else {
         header_only(img, &l, data)
     };
     let g = gray(img);
-    let tanks: Vec<_> = (0..6).map(|i| read_tank(img, &g, &l, i, data, !upstream)).collect();
+    use rayon::prelude::*;
+    let tanks: Vec<_> = (0..6).into_par_iter().map(|i| {
+        if upstream { read_tank(img, &g, &l, i, data, false) }
+        else { crate::adaptive::tank(img, &g, &l, i, data) }
+    }).collect();
     if hand.phase.is_none() && tanks.iter().all(|t| t.monster.is_none()) {
         return bare(Problem::NotFound);
     }
@@ -144,7 +149,8 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
         shelley: None,
     };
 
-    let round = read_text(img, &g, &l.round, TextKind::Round, &data.digits["round"]);
+    let round = if upstream { read_text(img, &g, &l.round, TextKind::Round, &data.digits["round"]) }
+        else { crate::adaptive::round(img, &g, &l, data) };
     let n: f64 = round.as_ref().and_then(|r| (!r.text.is_empty()).then(|| r.text.parse::<f64>().unwrap_or(f64::NAN))).unwrap_or(if round.is_some() { 0.0 } else { f64::NAN });
     let round_ok = round.as_ref().is_some_and(|r| n.fract() == 0.0 && (1.0..=13.0).contains(&n) && r.score >= DIGIT_MIN);
     state.round = Some(if round_ok { n as i32 } else { 1 });

@@ -97,6 +97,21 @@ pub struct Reading {
 }
 
 impl Reading {
+    /// Exactly the unresolved inputs that suppress production advice, suitable for local diagnostics.
+    pub fn blocking_fields(&self) -> Vec<String> {
+        let mut fields: Vec<String> = self.problems.iter().filter_map(|p| match p {
+            Problem::Unreadable { field } | Problem::UnknownArt { field, .. } => Some(field.clone()),
+            Problem::UnknownName { name } => Some(format!("card:{name}")),
+            _ => None,
+        }).collect();
+        if self.state.hand.is_empty() { fields.push("hand".into()); }
+        if self.state.phase != vorax::advisor::ScreenPhase::Protocol
+            && !self.fields.get("refreshes").is_some_and(|f| f.sure) { fields.push("refreshes".into()); }
+        fields.sort();
+        fields.dedup();
+        fields
+    }
+
     /// The interface scale it was read at.
     pub fn ui(&self) -> f64 {
         self.ui.unwrap_or(1.0)

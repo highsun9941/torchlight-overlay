@@ -7,7 +7,7 @@ use vorax_scan::layout::layout_at;
 use vorax_scan::live::carried_round;
 use vorax_scan::pixels::Img;
 use vorax_scan::reading::{Problem, Reading};
-use vorax_scan::titles::pictures;
+use vorax_scan::titles::pictures_adaptive as pictures;
 #[cfg(test)]
 use vorax_scan::titles::read_titles;
 use vorax_scan::track::{track_instruments, InstrumentTracker};
@@ -36,7 +36,7 @@ pub fn trustworthy(reading: &Reading) -> bool {
 pub enum Outcome {
     /// not the Surgical Preparation screen
     NotGame,
-    Uncertain,
+    Uncertain { reading: Box<Reading> },
     /// a card flying off as it's played: the last advice still stands
     Animating,
     /// the game closing after round 13's last pick (its end animation, the rewards): not a board
@@ -92,6 +92,13 @@ impl Pipeline {
             vorax::advisor::ScreenPhase::Instrument => {
                 if reading.fields.get("refreshes").is_some_and(|f| f.sure) {
                     self.instrument_refreshes = reading.state.instrument_refreshes;
+                } else if shelley_rerolls(self.shelley) == 0
+                    && reading.fields.get("refreshes").is_some_and(|f| f.guess.is_none()) {
+                    // With no pet rerolls the game omits this control entirely. An absent counter is
+                    // a known zero here, while a visible but unreadable digit still blocks advice.
+                    reading.state.instrument_refreshes = Some(0);
+                    reading.fields.insert("refreshes".into(), vorax_scan::reading::FieldRead { sure: true, guess: Some("0".into()), ..Default::default() });
+                    self.instrument_refreshes = Some(0);
                 }
             }
             _ => {
@@ -176,7 +183,7 @@ impl Pipeline {
         reading.state.shelley = Some(self.shelley);
         self.fill_rerolls(&mut reading);
         let read_ms = t.elapsed().as_secs_f64() * 1000.0;
-        if !trustworthy(&reading) { return Outcome::Uncertain; }
+        if !trustworthy(&reading) { return Outcome::Uncertain { reading: Box::new(reading) }; }
         let (advice, cached) = self.advise(&reading.state);
         let l = layout_at(img.width, img.height, reading.ui()).shifted_hand(reading.hand_dy.unwrap_or(0.0));
         self.card_frames = crate::card_frame::detect(&img, &l, reading.state.hand.len());

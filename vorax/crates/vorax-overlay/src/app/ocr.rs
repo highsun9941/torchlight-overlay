@@ -19,6 +19,9 @@ impl Ocr {
     pub fn new() -> windows::core::Result<Ocr> {
         let requested = std::env::var("VORAX_LANGUAGE").unwrap_or_else(|_| "ko".into());
         let en = Language::CreateLanguage(&HSTRING::from(if requested == "ko" { "ko-KR" } else { "en-US" }))?;
+        if requested == "ko" && !OcrEngine::IsLanguageSupported(&en)? {
+            return Err(windows::core::Error::new(windows::core::HRESULT(0x80070032u32 as i32), "Windows Korean OCR is not installed; using card art"));
+        }
         let engine = if OcrEngine::IsLanguageSupported(&en)? { OcrEngine::TryCreateFromLanguage(&en)? } else { OcrEngine::TryCreateFromUserProfileLanguages()? };
         let language = engine.RecognizerLanguage()?.LanguageTag()?.to_string();
         Ok(Ocr { engine, language, cache: Default::default() })
@@ -45,7 +48,8 @@ impl Ocr {
         }
         let text = lines.join("\n");
         let mut cache = self.cache.borrow_mut();
-        if cache.len() == 8 { cache.pop_front(); }
+        let capacity = if std::env::var("VORAX_OCR_MODE").is_ok_and(|v| v == "accurate") { 32 } else { 12 };
+        if cache.len() >= capacity { cache.pop_front(); }
         cache.push_back((img.clone(), text.clone()));
         Ok(text)
     }

@@ -22,6 +22,7 @@ pub fn run(args: &[String]) {
     // take it down under the factories the windows crate keeps cached
     unsafe {
         let _ = windows::Win32::System::Com::CoIncrementMTAUsage();
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
     // a crash's message into the debug log (a release build has no console to show it)
     std::panic::set_hook(Box::new(|info| {
@@ -187,41 +188,28 @@ pub fn run(args: &[String]) {
 /// reader on a known card title, and reading the picture. Writes the picture to `out`.
 fn inspect_frame(input: &std::path::Path, out: &std::path::Path) {
     unsafe { let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED); }
-    let img = crate::pipeline::decode_png(input).unwrap();
-    let ocr = ocr::Ocr::new().unwrap();
-    std::fs::create_dir_all(out).unwrap();
-    for ui in [1.0, 1.1, 1.125, 1.2, 1.25, 1.5] {
-        let names = vorax_scan::scan::scan_with(&img, vorax_scan::scan_data(), false, Some(0.0), false, ui, false);
-        let l = vorax_scan::layout::layout_at(img.width, img.height, ui);
-        let mut texts = vec![];
-        for (j, c) in l.cards.iter().enumerate() {
-            let crop = vorax_scan::titles::title_crop(&img, c, l.k);
-            let mut variants = vec![ocr.read(&crop).unwrap_or_default()];
-            for threshold in [30, 50, 70, 90] {
-                let gold = vorax_scan::titles::title_crop_gold(&img, c, l.k, threshold);
-                variants.push(ocr.read(&gold).unwrap_or_default());
-                let _ = crate::pipeline::encode_png(&out.join(format!("gold-{threshold}-{ui}-{j}.png")), gold.width as u32, gold.height as u32, &gold.data);
-            }
-            let mut half = crop.clone();
-            half.height /= 2;
-            half.data.truncate(half.width * half.height * 4);
-            variants.push(ocr.read(&half).unwrap_or_default());
-            for factor in [2, 3, 5] {
-                let mut enhanced = crop.clone();
-                for p in enhanced.data.chunks_exact_mut(4) {
-                    let v = 255u8.saturating_sub((255 - p[0]).saturating_mul(factor));
-                    p[0] = v; p[1] = v; p[2] = v;
-                }
-                variants.push(ocr.read(&enhanced).unwrap_or_default());
-            }
-            texts.push(variants);
-            let _ = crate::pipeline::encode_png(&out.join(format!("title-{ui}-{j}.png")), crop.width as u32, crop.height as u32, &crop.data);
-        }
-        let mut read_title = |crop: &vorax_scan::pixels::Img| ocr.read(crop).unwrap_or_default();
-        let reading = vorax_scan::titles::read_titles(&img, names, vorax_scan::scan_data(), &mut read_title, None);
-        let value = serde_json::json!({ "ui": ui, "texts": texts, "reading": reading });
-        std::fs::write(out.join(format!("read-{ui}.json")), serde_json::to_vec_pretty(&value).unwrap()).unwrap();
-    }
+    let frame = crate::pipeline::decode_png(input).expect("read diagnostic screenshot");
+    let img = vorax_scan::window::windowed_game(&frame).map_or_else(|| frame.clone(), |r| vorax_scan::window::crop_to(&frame, &r));
+    std::fs::create_dir_all(out).expect("create diagnostic directory");
+    let _ = crate::pipeline::encode_png(&out.join("client.png"), img.width as u32, img.height as u32, &img.data);
+    let ocr = ocr::Ocr::new().ok();
+    let mut reader = |crop: &vorax_scan::pixels::Img| ocr.as_ref().and_then(|o| o.read(crop).ok()).unwrap_or_default();
+    let mut pipeline = crate::pipeline::Pipeline::new(0);
+    let result = pipeline.run(&img, None, ocr.as_ref().map(|_| &mut reader as &mut dyn FnMut(&vorax_scan::pixels::Img) -> String));
+    let (kind, reading) = match result {
+        crate::pipeline::Outcome::Advice { reading, .. } => ("advice", Some(reading)),
+        crate::pipeline::Outcome::Uncertain { reading } => ("uncertain", Some(reading)),
+        crate::pipeline::Outcome::Animating => ("animating", None),
+        crate::pipeline::Outcome::NotGame => ("notgame", None),
+        crate::pipeline::Outcome::Closing => ("closing", None),
+    };
+    let value = serde_json::json!({
+        "outcome": kind,
+        "ocrLanguage": ocr.as_ref().map(|o| &o.language),
+        "blockingFields": reading.as_ref().map(|r| r.blocking_fields()),
+        "reading": reading,
+    });
+    std::fs::write(out.join("reading.json"), serde_json::to_vec_pretty(&value).unwrap()).expect("save diagnostic result");
 }
 
 fn benchmark_frame(input: &std::path::Path, out: &std::path::Path, shelley: i32) {
@@ -306,7 +294,7 @@ fn selftest(out: PathBuf) {
             match p.run(&img, None, Some(&mut read_title)) {
                 crate::pipeline::Outcome::Advice { advice, plan, read_ms, .. } => println!("read in {read_ms:.0} ms, advice in {} ms: {:?}", advice.ms, plan.pill.map(|p| p.main)),
                 crate::pipeline::Outcome::Animating => println!("read: a card is moving"),
-                crate::pipeline::Outcome::Uncertain => println!("read: uncertain fields; advice withheld"),
+                crate::pipeline::Outcome::Uncertain { .. } => println!("read: uncertain fields; advice withheld"),
                 crate::pipeline::Outcome::NotGame => println!("read: not the Surgical Preparation screen (expected outside Vorax)"),
                 crate::pipeline::Outcome::Closing => println!("read: the game closing after round 13"),
             }

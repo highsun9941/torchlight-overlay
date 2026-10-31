@@ -5,7 +5,7 @@
 use crate::cards::read_at;
 use crate::data::ScanData;
 use crate::layout::{card_face, layout_at, CardPos};
-use crate::pixels::{clamp_u8, patch, Img, Rect};
+use crate::pixels::{clamp_u8, patch, resize, Img, Rect};
 use crate::reading::{FieldRead, Fields, Problem, Reading};
 use std::collections::HashMap;
 
@@ -147,6 +147,17 @@ pub fn pictures(img: &Img, data: &ScanData, phase: &str, size: usize, slots: &[u
         .collect()
 }
 
+/// Production fallback for translated cards; original `pictures` stays available to the trace reader.
+pub fn pictures_adaptive(img: &Img, data: &ScanData, phase: &str, size: usize, slots: &[usize], hand_dy: f64, ui: f64) -> HashMap<usize, PictureRead> {
+    let l = layout_at(img.width, img.height, ui).shifted_hand(hand_dy);
+    let read = crate::cards::read_at_art(img, &l, size, phase, data, Some(slots));
+    slots.iter().map(|&j| {
+        let key = format!("hand{j}");
+        let unknown = read.problems.iter().any(|p| matches!(p, Problem::UnknownArt { field, .. } if *field == key));
+        (j, PictureRead { ranks: read.ranks[j].clone(), field: read.fields.get(&key).cloned(), unknown })
+    }).collect()
+}
+
 const PHASES: [&str; 3] = ["potion", "instrument", "protocol"];
 
 /// The reading with each card's printed name added. `read_text` reads a title crop (OCR); `pictures` matches
@@ -175,6 +186,19 @@ pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_tex
         if (gold_first || text.chars().any(crate::korean::hangul)) && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
             let other = read_text(&if gold_first { title_crop(img, c, l.k) } else { title_crop_gold(img, c, l.k, 70) });
             if phases.iter().any(|phase| settled(&ranked(data, phase, &other))) { return other; }
+        }
+        if std::env::var("VORAX_OCR_MODE").is_ok_and(|v| v == "accurate")
+            && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
+            let crop = title_crop(img, c, l.k);
+            for scale in [1.5, 2.0] {
+                let enlarged = resize(&crop, (crop.width as f64 * scale) as usize, (crop.height as f64 * scale) as usize);
+                let candidate = read_text(&enlarged);
+                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+            }
+            for threshold in [50, 90] {
+                let candidate = read_text(&title_crop_gold(img, c, l.k, threshold));
+                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+            }
         }
         text
     }).collect();
