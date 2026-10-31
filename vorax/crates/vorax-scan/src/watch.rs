@@ -33,8 +33,12 @@ impl Stamp {
             // Enlarging one offer also slides its neighbours. Round, refreshes, validated tanks and
             // the instrument panel still detect actual actions while this temporary fan motion is masked.
             add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, moving);
-            let heading=crate::titles::heading_crop(img,c,l.k);
-            titles.push((format!("hand{i}.title"),sample(&heading,&Rect::new(0.0,0.0,heading.width as f64,heading.height as f64),false)));
+            let (heading,area)=crate::titles::located_heading(img,c,l.k,false);
+            // An unlocated/short fragment must keep the original narrow-region comparison:
+            // even a small suffix change can identify a different offer.
+            if area.h<42.0*l.k {
+                titles.push((format!("hand{i}.title"),sample(&heading,&Rect::new(0.0,0.0,heading.width as f64,heading.height as f64),false)));
+            }
             add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, moving);
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }

@@ -7,6 +7,7 @@ pub struct RoundMemory {
     saved: Option<Reading>,
     pub revision: u64,
     pub reused: Vec<String>,
+    pub suspended: bool,
 }
 
 #[cfg(test)]
@@ -50,6 +51,14 @@ mod tests {
             memory.restore(&mut after);assert!(memory.names().is_empty(),"change {change}");assert_eq!(memory.revision,1);
         }
     }
+    #[test]
+    fn a_possible_next_round_withholds_old_values_without_erasing_the_saved_offer() {
+        let mut memory=RoundMemory::default();memory.remember(&round_known());
+        let mut next=partial();let field=next.fields.get_mut("round").unwrap();field.guess=Some("9".into());field.score=Some(0.69);
+        memory.restore(&mut next);assert!(memory.suspended);assert!(!sure(&next,"round"));assert!(memory.names().is_empty());
+        memory.remember(&next);assert_eq!(memory.round(),Some(8));
+        let mut same=partial();memory.restore(&mut same);assert!(!memory.suspended);assert!(sure(&same,"round"));assert_eq!(same.state.round,Some(8));
+    }
 }
 
 fn sure(r: &Reading, field: &str) -> bool { r.fields.get(field).is_some_and(|f| f.sure) }
@@ -65,9 +74,10 @@ fn refreshes(r: &Reading) -> Option<i32> {
 }
 
 impl RoundMemory {
-    pub fn clear(&mut self) { self.saved = None; self.reused.clear(); self.revision += 1; }
+    pub fn clear(&mut self) { self.saved = None; self.reused.clear(); self.suspended=false; self.revision += 1; }
     pub fn round(&self) -> Option<i32> { self.saved.as_ref().filter(|r| sure(r,"round")).and_then(|r| r.state.round) }
     pub fn names(&self) -> BTreeMap<usize, String> {
+        if self.suspended {return BTreeMap::new();}
         self.saved.as_ref().map_or_else(BTreeMap::new, |r| (0..hand_size(r)).filter_map(|i| {
             r.fields.get(&format!("hand{i}")).filter(|f| f.sure).and_then(|f| f.guess.clone()).map(|n| (i,n))
         }).collect())
@@ -80,6 +90,7 @@ impl RoundMemory {
     /// cannot erase an earlier confirmation. Refreshes matter even when the round stays the same.
     pub fn restore(&mut self, current: &mut Reading) {
         self.reused.clear();
+        self.suspended=false;
         let Some(old) = &self.saved else { return };
         let changed = (sure(old,"round") && sure(current,"round") && old.state.round != current.state.round)
             || (sure(old,"phase") && sure(current,"phase") && old.state.phase != current.state.phase)
@@ -92,6 +103,12 @@ impl RoundMemory {
             });
         if changed { self.clear(); return; }
         let old = self.saved.as_ref().unwrap();
+        // A plausible next-round digit is a reason to verify the transition, not to silently
+        // overwrite it with the old confirmed round. Keep the memory, but withhold its reuse.
+        if sure(old,"round") && !sure(current,"round") && current.fields.get("round").is_some_and(|f|
+            f.score.is_some_and(|s|s>=0.6) && f.guess.as_deref().and_then(|s|s.parse::<i32>().ok())==old.state.round.map(|n|n+1)) {
+            self.suspended=true;return;
+        }
         let mut copied = Vec::new();
         if sure(old,"round") && !sure(current,"round") {
             current.state.round = old.state.round;
@@ -125,5 +142,5 @@ impl RoundMemory {
         }
         self.reused = copied;
     }
-    pub fn remember(&mut self, reading: &Reading) { self.saved = Some(reading.clone()); }
+    pub fn remember(&mut self, reading: &Reading) { if !self.suspended {self.saved = Some(reading.clone());} }
 }

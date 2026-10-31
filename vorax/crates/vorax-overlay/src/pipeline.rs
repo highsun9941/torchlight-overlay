@@ -116,7 +116,7 @@ impl Pipeline {
         self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.zoom_candidate=None; self.zoom_dirty=false;
         self.memory.clear();
     }
-    pub fn memory_status(&self) -> serde_json::Value { serde_json::json!({"revision":self.memory.revision,"round":self.memory.round(),"confirmed":self.memory.confirmed(),"reused":self.memory.reused}) }
+    pub fn memory_status(&self) -> serde_json::Value { serde_json::json!({"revision":self.memory.revision,"round":self.memory.round(),"confirmed":self.memory.confirmed(),"reused":self.memory.reused,"transitionCheck":self.memory.suspended}) }
     pub fn progress(&self) -> String {
         let Some(r)=&self.pending else {return "화면 확인 중".into()};
         let round=if r.fields.get("round").is_some_and(|f|f.sure) {format!("{}라운드",r.state.round.unwrap_or(1))} else {"라운드 확인 중".into()};
@@ -385,6 +385,28 @@ mod tests {
     fn round_eight(file:&str)->super::Img {
         let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round-memory").join(file)).unwrap();
         super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
+    }
+
+    #[test]
+    fn assistance_waits_for_the_base_then_requests_only_one_unconfirmed_card() {
+        use super::*;
+        let value:serde_json::Value=serde_json::from_str(include_str!("../../../fixtures/round-memory/reading-0.json")).unwrap();
+        let mut r:Reading=serde_json::from_value(value["reading"].clone()).unwrap();
+        r.fields.get_mut("hand0").unwrap().sure=false;
+        let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut r);
+        assert!(pipe.requested_slots().is_empty(),"confirm the round/tanks before asking for a card");
+        r.fields.get_mut("round").unwrap().sure=true;r.state.round=Some(8);
+        r.problems.retain(|p|!matches!(p,Problem::Unreadable{field} if field=="round"));
+        pipe.apply_zoom(&mut r);assert_eq!(pipe.requested_slots(),[0]);
+        for (i,name) in ["Mutagenic Powder","Twin Hormone - Pest"].iter().enumerate() {
+            let read=vorax_scan::hover::HoverRead{name:name.to_string(),text:name.to_string(),title_score:12.0,art_score:0.99,
+                tooltip:vorax_scan::hover::Tooltip{rect:Default::default(),center:vorax_scan::hover::CardPosData{x:0.0,y:0.0},scale:1.0},title_area:Default::default(),match_kind:"complete_title".into()};
+            let at=500.0+i as f64*1000.0;
+            assert!(!pipe.confirm_hover(i,&read,at));assert!(pipe.confirm_hover(i,&read,at+500.0));
+            assert_eq!(pipe.requested_slots(),if i==0 {vec![1]} else {vec![]});
+        }
+        assert_eq!(pipe.memory.names().len(),3);
+        assert_eq!(pipe.pending().unwrap().state.round,Some(8));
     }
 
     #[test]
