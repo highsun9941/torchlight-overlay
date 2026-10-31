@@ -319,6 +319,11 @@ pub fn read_titles(img: &Img, reading: Reading, data: &ScanData, read_text: &mut
 /// Korean's gold headings are fastest and clearest in the blue-channel mask. The original adaptive
 /// contrast remains the fallback, and the default entry point preserves the upstream reading contract.
 pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_text: &mut dyn FnMut(&Img) -> String, pictures_of: Option<&dyn Fn(&str, usize, &[usize]) -> HashMap<usize, PictureRead>>, gold_first: bool) -> Reading {
+    read_titles_styled_known(img,reading,data,read_text,pictures_of,gold_first,&Default::default())
+}
+
+/// Names already confirmed on this offer are supplied explicitly, without inventing OCR scores.
+pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, read_text: &mut dyn FnMut(&Img) -> String, pictures_of: Option<&dyn Fn(&str, usize, &[usize]) -> HashMap<usize, PictureRead>>, gold_first: bool, known: &std::collections::BTreeMap<usize,String>) -> Reading {
     let read = reading.hand_ranks.as_ref().map_or(0, |r| r.len());
     if (read == 0 && reading.hand_pending != Some(true)) || reading.has(|p| matches!(p, Problem::NotFound | Problem::Animating)) {
         return reading;
@@ -332,6 +337,7 @@ pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_tex
     let phases: Vec<&str> = if reading.fields.get("phase").is_some_and(|f| f.sure) { vec![header] } else { PHASES.to_vec() };
     let size = if read > 0 { read } else { reading.hand_size.unwrap_or(3) };
     let texts: Vec<String> = l.hand_at(size).iter().enumerate().map(|(j, c)| {
+        if let Some(name) = known.get(&j) { return if gold_first {crate::korean::name(name).to_string()} else {name.clone()}; }
         if gold_first {
             if let Some(name) = reading.fields.get(&format!("hand{j}"))
                 .filter(|f| f.sure && f.second.is_none() && f.score.is_some_and(|s| s >= 0.94))

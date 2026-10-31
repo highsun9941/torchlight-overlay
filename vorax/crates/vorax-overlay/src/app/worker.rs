@@ -142,6 +142,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             if settler.over && !was_over {
                 note("the game's Vorax screen closed");
                 pipe.invalidate();
+                pipe.reset_hover();
                 status("수술 준비 화면 대기", "다음 화면을 기다립니다.", "보드 닫힘");
                 send(ToUi::Clear);
                 retry = None;
@@ -212,7 +213,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                                 if let (Ok(result),Some(slot))=(result,slot) {
                                     if pipe.confirm_hover(slot,&result,now_ms()) {
                                         diagnostics::event(hover_id,"hover_confirmed",serde_json::json!({"slot":slot,"name":result.name,"remaining":pipe.requested_slots()}));
-                                        status("확대 인식 완료","다음 파란 카드에 마우스를 올리거나, 카드 밖으로 옮겨 추천을 갱신하세요.","확대 결과 유지 중");
+                                        status("확대 인식 완료","다음 파란 카드에 마우스를 올리거나, 카드 밖으로 옮겨 추천을 갱신하세요.",&pipe.progress());
                                         if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
                                     } else {status("확대 스캔 확인 중",&format!("{}번 확대 카드 내용을 한 번 더 확인합니다.",slot+1),"같은 이름 두 번 확인");}
                                 } else {
@@ -238,7 +239,9 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         Change::Changed => {
                             diagnostics::event(0,"visual_change",serde_json::json!({"areas":watch.last_difference}));
                             pipe.invalidate();
-                            pipe.reset_hover();
+                            // Pixel motion hides advice, but does not erase confirmed fields. The
+                            // next structural read ends the offer only on verified action evidence.
+                            pipe.cancel_hover_candidate();
                             retry = None;
                             relook_at = None;
                             status("화면 변경 감지", "화면이 안정되면 자동으로 다시 읽습니다.", "이전 추천 숨김");
@@ -269,7 +272,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             retry = None;
             let trigger = match due {
                 Some(Trigger::Screen) => Some("screen"),
-                Some(_) => Some("board"),
+                Some(kind) => Some(kind.name()),
                 None if visual => Some("visual"),
                 None => again.and_then(|(_, t)| t),
             };
@@ -363,7 +366,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
     drop(read_text);
     let kind=match &outcome {Outcome::Advice{..}=>"advice",Outcome::Uncertain{..}=>"uncertain",Outcome::Animating=>"animating",Outcome::NotGame=>"not_game",Outcome::Closing=>"closing"};
     let reading=match &outcome {Outcome::Advice{reading,..}|Outcome::Uncertain{reading}=>Some(reading.as_ref()),_=>None};
-    diagnostics::event(scan_id,"recognition",serde_json::json!({"size":[frame.width,frame.height],"captureMs":grabbed,"outcome":kind,"ui":pipe.ui(),"blocking":reading.map(|r|r.blocking_fields()),"ocr":ocr_attempts}));
+    diagnostics::event(scan_id,"recognition",serde_json::json!({"size":[frame.width,frame.height],"captureMs":grabbed,"outcome":kind,"ui":pipe.ui(),"blocking":reading.map(|r|r.blocking_fields()),"memory":pipe.memory_status(),"ocr":ocr_attempts}));
     if kind=="uncertain" {diagnostics::save(scan_id,kind,&frame,None,reading,&ocr_attempts,&crops,serde_json::json!({"trigger":trigger}));}
     watch.accept(&frame, pipe.ui());
     if matches!(&outcome, Outcome::Advice { .. }) {
@@ -429,10 +432,11 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
             let detail = fields.iter().map(|field| field_label(field)).collect::<Vec<_>>().join(", ");
             if let Some(plan)=pipe.hover_plan() {
                 let size=reading.frame.as_ref().map_or((frame.width,frame.height),|f|(f.width,f.height));
-                status("확대 스캔 요청",&format!("파란 카드에 마우스를 올려 주세요. 확인할 항목: {detail}"),"좌측 하단 확대 카드 인식 대기");
+                let slot=pipe.requested_slots()[0]+1;
+                status("확대 스캔 요청",&format!("{slot}번 카드에 마우스를 올려 주세요. 이미 확인한 항목은 유지합니다."),&pipe.progress());
                 send(ToUi::Show(plan,size.0,size.1));
             } else {
-                status("인식 확인 필요",&format!("확인할 항목: {detail}. Ctrl+Alt+X로 재시도할 수 있습니다."),"추천 보류");send(ToUi::Clear);
+                status("인식 확인 필요",&format!("확인할 항목: {detail}. Ctrl+Alt+X로 재시도할 수 있습니다."),&pipe.progress());send(ToUi::Clear);
             }
         }
         Outcome::Animating => {

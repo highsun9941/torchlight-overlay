@@ -34,6 +34,17 @@ pub fn trustworthy(reading: &Reading) -> bool {
         && (reading.state.phase == vorax::advisor::ScreenPhase::Protocol || reading.fields.get("refreshes").is_some_and(|f| f.sure))
 }
 
+fn recover_round(img:&Img, result:&mut Reading, read:&mut dyn FnMut(&Img)->String) {
+    if let Some(field)=result.fields.get("round").filter(|f|!f.sure) {
+        let text=read(&vorax_scan::text::round_ocr_crop(img,&layout_at(img.width,img.height,result.ui())));
+        if let Some(n)=vorax_scan::text::ocr_round(&text,field.guess.as_deref(),field.score.unwrap_or(0.0)) {
+            result.state.round=Some(n);
+            result.fields.insert("round".into(),vorax_scan::reading::FieldRead{sure:true,guess:Some(n.to_string()),..Default::default()});
+            result.problems.retain(|p|!matches!(p,Problem::Unreadable{field} if field=="round"));
+        }
+    }
+}
+
 pub enum Outcome {
     /// not the Surgical Preparation screen
     NotGame,
@@ -62,6 +73,7 @@ pub struct Pipeline {
     zoom_names: std::collections::BTreeMap<usize, String>,
     zoom_candidate: Option<(usize, String, f64)>,
     zoom_dirty: bool,
+    memory: crate::round_memory::RoundMemory,
     /// this game reached the Surgical Protocols (rounds 11-13): a board after them with no cards in hand is the game
     /// closing (its end animation, the rewards). Read as a board it gave six 1횞1 monsters in "round 1"; round 13's
     /// own board may not be read first (caught mid-animation, or its number read as 12)
@@ -89,7 +101,7 @@ pub fn shelley_rerolls(level: i32) -> i32 {
 
 impl Pipeline {
     pub fn new(shelley: i32) -> Pipeline {
-        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, zoom_dirty: false, protocols: false, resumed: false }
+        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, zoom_dirty: false, memory: Default::default(), protocols: false, resumed: false }
     }
 
     pub fn ui(&self) -> f64 { self.last.as_ref().map_or(1.0, |(r, ..)| r.ui()) }
@@ -102,9 +114,21 @@ impl Pipeline {
     pub fn cancel_hover_candidate(&mut self) { self.zoom_candidate=None; }
     pub fn reset_hover(&mut self) {
         self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.zoom_candidate=None; self.zoom_dirty=false;
+        self.memory.clear();
+    }
+    pub fn memory_status(&self) -> serde_json::Value { serde_json::json!({"revision":self.memory.revision,"round":self.memory.round(),"confirmed":self.memory.confirmed(),"reused":self.memory.reused,"transitionCheck":self.memory.suspended}) }
+    pub fn progress(&self) -> String {
+        let Some(r)=&self.pending else {return "화면 확인 중".into()};
+        let round=if r.fields.get("round").is_some_and(|f|f.sure) {format!("{}라운드",r.state.round.unwrap_or(1))} else {"라운드 확인 중".into()};
+        let known=(0..r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3),|h|h.len().max(3))).filter(|i|r.fields.get(&format!("hand{i}")).is_some_and(|f|f.sure)).count();
+        format!("{round} · 카드 {known}장 확인 유지")
     }
     pub fn requested_slots(&self) -> Vec<usize> {
-        self.pending.as_ref().map_or_else(Vec::new, |r| r.blocking_fields().iter().filter_map(|f|f.strip_prefix("hand").and_then(|n|n.parse().ok())).collect())
+        self.pending.as_ref().map_or_else(Vec::new, |r| {
+            let fields=r.blocking_fields();
+            if fields.iter().any(|f|f=="round" || f=="refreshes" || f.starts_with("tank")) {return Vec::new();}
+            fields.iter().filter_map(|f|f.strip_prefix("hand").and_then(|n|n.parse().ok())).take(1).collect()
+        })
     }
     pub fn hover_plan(&self) -> Option<Plan> {
         let r=self.pending.as_ref()?;
@@ -121,25 +145,30 @@ impl Pipeline {
             self.zoom_names.insert(slot,read.name.clone());self.zoom_candidate=None;self.zoom_dirty=true;
             if let Some(r)=&mut self.pending {
                 let field=format!("hand{slot}");
-                r.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(read.name.clone()),score:Some(1.0),second:None});
+                r.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(read.name.clone()),score:Some(read.title_score),second:None});
                 r.problems.retain(|p|!matches!(p,Problem::UnknownArt{field:f,..} if f==&field));
+                r.state.hand=(0..r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3),|h|h.len().max(3))).filter_map(|i|r.fields.get(&format!("hand{i}")).and_then(|f|f.guess.clone())).collect();
+                self.memory.remember(r);
             }
             true
         } else {self.zoom_candidate=Some((slot,read.name.clone(),now));false}
     }
     fn apply_zoom(&mut self, reading:&mut Reading) {
-        let mut state=reading.state.clone(); state.hand.clear();state.shelley=None;
-        let key=serde_json::to_string(&state).unwrap_or_default();
+        self.memory.restore(reading);
+        let key=self.memory.revision.to_string();
         if key!=self.zoom_board {self.zoom_board=key;self.zoom_names.clear();self.zoom_candidate=None;self.zoom_dirty=false;}
         for (i,name) in &self.zoom_names {
             let field=format!("hand{i}");
-            reading.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(name.clone()),score:Some(1.0),second:None});
+            if !reading.fields.get(&field).is_some_and(|f|f.sure && f.guess.as_ref()==Some(name)) {
+                reading.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(name.clone()),score:None,second:None});
+            }
             reading.problems.retain(|p|!matches!(p,Problem::UnknownArt {field:f,..} if f==&field));
         }
         if !self.zoom_names.is_empty() {
             let size=reading.hand_ranks.as_ref().map_or(reading.hand_size.unwrap_or(3),|h|h.len().max(3));
             reading.state.hand=(0..size).filter_map(|i|reading.fields.get(&format!("hand{i}")).and_then(|f|f.guess.clone())).collect();
         }
+        self.memory.remember(reading);
         self.pending=Some(reading.clone());
     }
 
@@ -186,6 +215,8 @@ impl Pipeline {
     /// `frame`: the captured game window; `trigger`: "screen" when the log says a new game opened.
     pub fn run(&mut self, frame: &Img, trigger: Option<&str>, ocr: TextReader) -> Outcome {
         let t = std::time::Instant::now();
+        let prior_round=self.memory.round().or_else(||self.last.as_ref().and_then(|(r,..)|r.state.round));
+        if matches!(trigger,Some("board" | "refresh" | "screen")) {self.reset_hover();}
         self.invalidate();
         self.resumed = false;
         let data = scan_data();
@@ -194,7 +225,7 @@ impl Pipeline {
             None => frame.clone(),
         };
         // with a text reader: the cards by their printed names, by their pictures only where a name doesn't settle
-        let mut raw = match ocr {
+        let raw = match ocr {
             Some(read) => {
                 // A title shape is only authoritative when every offered card is independently
                 // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
@@ -207,10 +238,13 @@ impl Pipeline {
                     }));
                 let mut result = if verified { pictured.unwrap() } else {
                     // Preserve independently verified slots even when another card still needs OCR.
-                    let names = pictured.unwrap_or_else(|| scan(&img, data, false));
+                    let mut names = pictured.unwrap_or_else(|| scan(&img, data, false));
+                    self.memory.restore(&mut names);
+                    recover_round(&img,&mut names,read);
+                    let known=self.memory.names();
                     let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
                     let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
-                    let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
+                    let named = vorax_scan::titles::read_titles_styled_known(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"),&known);
                     if named.state.hand.is_empty() || named.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. })) {
                         let pictured = scan(&img, data, true);
                         if !pictured.state.hand.is_empty() && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating)) {
@@ -218,14 +252,8 @@ impl Pipeline {
                         } else { named }
                     } else { named }
                 };
-                if let Some(field) = result.fields.get("round").filter(|f| !f.sure) {
-                    let text = read(&vorax_scan::text::round_ocr_crop(&img, &layout_at(img.width, img.height, result.ui())));
-                    if let Some(n) = vorax_scan::text::ocr_round(&text, field.guess.as_deref(), field.score.unwrap_or(0.0)) {
-                        result.state.round = Some(n);
-                        result.fields.insert("round".into(), vorax_scan::reading::FieldRead { sure: true, guess: Some(n.to_string()), ..Default::default() });
-                        result.problems.retain(|p| !matches!(p, Problem::Unreadable { field } if field == "round"));
-                    }
-                }
+                self.memory.restore(&mut result);
+                recover_round(&img,&mut result,read);
                 result
             }
             None => scan(&img, data, true),
@@ -245,7 +273,7 @@ impl Pipeline {
         // the screen opened again on the game under way (Escape and back skips long animations): what's known of it
         // (instruments and their rounds, rerolls) is kept
         let round_sure = raw.fields.get("round").is_some_and(|f| f.sure);
-        let before = self.last.as_ref().and_then(|(r, ..)| r.state.round);
+        let before = prior_round;
         self.resumed = trigger == Some("screen") && resumes(before, round_sure.then_some(raw.state.round.unwrap_or(1)));
         let trigger = if self.resumed { None } else { trigger };
         if trigger == Some("screen") {
@@ -353,6 +381,96 @@ pub fn encode_png(path: &std::path::Path, w: u32, h: u32, rgba: &[u8]) -> Result
 #[cfg(test)]
 mod tests {
     use super::resumes;
+
+    fn round_eight(file:&str)->super::Img {
+        let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round-memory").join(file)).unwrap();
+        super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
+    }
+
+    #[test]
+    fn assistance_waits_for_the_base_then_requests_only_one_unconfirmed_card() {
+        use super::*;
+        let value:serde_json::Value=serde_json::from_str(include_str!("../../../fixtures/round-memory/reading-0.json")).unwrap();
+        let mut r:Reading=serde_json::from_value(value["reading"].clone()).unwrap();
+        r.fields.get_mut("hand0").unwrap().sure=false;
+        let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut r);
+        assert!(pipe.requested_slots().is_empty(),"confirm the round/tanks before asking for a card");
+        r.fields.get_mut("round").unwrap().sure=true;r.state.round=Some(8);
+        r.problems.retain(|p|!matches!(p,Problem::Unreadable{field} if field=="round"));
+        pipe.apply_zoom(&mut r);assert_eq!(pipe.requested_slots(),[0]);
+        for (i,name) in ["Mutagenic Powder","Twin Hormone - Pest"].iter().enumerate() {
+            let read=vorax_scan::hover::HoverRead{name:name.to_string(),text:name.to_string(),title_score:12.0,art_score:0.99,
+                tooltip:vorax_scan::hover::Tooltip{rect:Default::default(),center:vorax_scan::hover::CardPosData{x:0.0,y:0.0},scale:1.0},title_area:Default::default(),match_kind:"complete_title".into()};
+            let at=500.0+i as f64*1000.0;
+            assert!(!pipe.confirm_hover(i,&read,at));assert!(pipe.confirm_hover(i,&read,at+500.0));
+            assert_eq!(pipe.requested_slots(),if i==0 {vec![1]} else {vec![]});
+        }
+        assert_eq!(pipe.memory.names().len(),3);
+        assert_eq!(pipe.pending().unwrap().state.round,Some(8));
+    }
+
+    #[test]
+    fn grey_normal_tooltip_enters_ocr_and_rejects_the_other_twin_variant() {
+        use super::*;
+        let frame=round_eight("normal-tooltip.png");let search=vorax_scan::hover::inspect_tooltip(&frame);
+        let tip=search.tooltip.as_ref().unwrap_or_else(||panic!("normal card: {search:?}"));
+        assert_eq!(search.method,Some("neutral_edges"));
+        assert!((tip.rect.x-41.0).abs()<10.0 && (tip.rect.y-395.0).abs()<12.0,"{search:?}");
+        assert!((tip.rect.w-208.0).abs()<12.0 && (tip.rect.h-311.0).abs()<16.0,"{search:?}");
+        let mut text=|_:&Img|"쌍둥이 호르몬-독충".to_string();
+        let read=vorax_scan::hover::recognize(&frame,"potion",&[("Twin Hormone - Pest".into(),0.999)],&mut text).unwrap();
+        assert_eq!(read.name,"Twin Hormone - Pest");assert!(read.art_score>=0.92);
+        assert!(vorax_scan::hover::recognize(&frame,"potion",&[("Twin Hormone - Bone Sentry".into(),0.999)],&mut text).is_err());
+        for name in ["offer.png","rest.png","rest-noisy.png"] {assert!(vorax_scan::hover::tooltip(&round_eight(name)).is_none(),"a bare reward panel is not an enlarged card: {name}");}
+    }
+
+    #[test]
+    fn round_eight_is_read_and_kept_while_the_middle_card_is_confirmed_separately() {
+        use super::*;
+        fn ordinary()->impl FnMut(&Img)->String {
+            let mut heading=0;
+            move |img:&Img| {
+                if (img.width,img.height)==(464,120) {heading+=1;}
+                match heading {1=>"변이 유도 가루약",2=>"1 그룹 몬스터를 선택해",_=>"의식 회복용 소금"}.to_string()
+            }
+        }
+        let first=round_eight("offer.png");let mut pipe=Pipeline::new(0);let mut text=ordinary();
+        let result=pipe.run(&first,None,Some(&mut text));
+        let Outcome::Uncertain{reading}=result else {panic!("the recorded unread title needs assistance")};
+        assert_eq!(reading.state.round,Some(8));assert!(reading.fields["round"].sure);
+        assert_eq!(pipe.requested_slots(),[1]);assert_eq!(pipe.hover_plan().unwrap().inspect.len(),1);
+        let frame=round_eight("normal-tooltip.png");let mut text=|_:&Img|"쌍둥이 호르몬-독충".to_string();
+        let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text).unwrap();
+        assert!(!pipe.confirm_hover(1,&read,500.0));assert!(pipe.confirm_hover(1,&read,1000.0));
+        assert!(pipe.requested_slots().is_empty());
+        pipe.invalidate(); // A visual-change notification hides advice but keeps this offer's fields.
+        for name in ["rest.png","rest-noisy.png","offer.png"] {
+            let mut no_repeat=|_:&Img|->String {panic!("a confirmed offer must not OCR the same round or cards again")};
+            match pipe.run(&round_eight(name),None,Some(&mut no_repeat)) {
+                Outcome::Advice{reading,..}=>{
+                    assert_eq!(reading.state.round,Some(8));assert_eq!(reading.state.hand,["Mutagenic Powder","Twin Hormone - Pest","Rousing Salts"]);
+                    let t=reading.state.tanks[0].as_ref().unwrap();assert_eq!((t.activity,t.quantity),(11,549));
+                    assert!(pipe.requested_slots().is_empty());
+                },
+                Outcome::Uncertain{reading}=>panic!("round/card loop: {}",serde_json::to_string(&reading).unwrap()),
+                _=>panic!("the unchanged offer should retain advice"),
+            }
+        }
+        pipe.reset_hover();assert!(pipe.memory.names().is_empty(),"a confirmed game action ends the offer");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_windows_reads_the_dim_round_fraction() {
+        use super::*;
+        unsafe {let _=windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);}
+        let ocr=crate::app::ocr::Ocr::for_language("en").expect("Windows digit OCR");
+        for name in ["offer.png","rest.png","normal-tooltip.png"] {
+            let frame=round_eight(name);let l=layout_at(frame.width,frame.height,1.0);
+            let crop=vorax_scan::text::round_ocr_crop(&frame,&l);let text=ocr.read(&crop).unwrap();
+            assert_eq!(vorax_scan::text::ocr_round(&text,Some("8"),0.615),Some(8),"{name}: {text:?}");
+        }
+    }
 
     #[test]
     fn an_ambiguous_name_without_an_unknown_art_problem_still_requests_enlarged_ocr() {
@@ -682,6 +800,9 @@ mod tests {
             let text=ocr.read(&vorax_scan::titles::heading_crop(&frame,&l.cards[1],l.k)).unwrap();
             assert!(vorax_scan::titles::name_fit("Green Bile Solution",&text)>=6.0,"actual moving-title OCR {file}: {text}");
         }
+        let frame=round_eight("normal-tooltip.png");let mut text=|img:&Img|ocr.read(img).unwrap();
+        let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text);
+        assert!(matches!(&read,Ok(r) if r.name=="Twin Hormone - Pest"),"normal grey tooltip: {read:?}");
     }
 
     fn blue_potion(i:usize)->super::Img {

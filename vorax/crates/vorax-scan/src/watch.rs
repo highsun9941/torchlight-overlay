@@ -1,5 +1,5 @@
 //! Compare named UI regions by shape, with hover motion and the left-hand tooltip excluded.
-use crate::layout::{card_face, layout_at};
+use crate::layout::layout_at;
 use crate::pixels::{gray, Img, Rect};
 
 #[derive(Clone)]
@@ -28,13 +28,23 @@ impl Stamp {
         add("refreshes".into(), l.refresh, true, false);
         // Unused fan positions contain animated scenery on a three-card offer.
         let size = crate::cards::fan_size(img, &l);
+        let mut titles=Vec::new();
         for (i, c) in l.hand_at(size).iter().enumerate() {
             // Enlarging one offer also slides its neighbours. Round, refreshes, validated tanks and
             // the instrument panel still detect actual actions while this temporary fan motion is masked.
             add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, moving);
+            let (heading,area)=crate::titles::located_heading(img,c,l.k,false);
+            // An unlocated/short fragment must keep the original narrow-region comparison:
+            // even a small suffix change can identify a different offer.
+            if area.h<42.0*l.k {
+                titles.push((format!("hand{i}.title"),sample(&heading,&Rect::new(0.0,0.0,heading.width as f64,heading.height as f64),false)));
+            }
             add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, moving);
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
+        // Compare the text itself, rather than the red card's pulsing background or an adjacent
+        // description line. All three moving headings use the same per-frame locator as OCR.
+        for (name,values) in titles {if let Some(area)=areas.iter_mut().find(|a|a.name==name) {area.values=values;}}
         let count=crate::cards::cards_present(img,&l);
         let present=if count<3 && tooltip.is_some() {3} else {count};
         let g=gray(img);
