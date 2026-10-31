@@ -36,7 +36,7 @@ impl Stamp {
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
         let count=crate::cards::cards_present(img,&l);
-        let present=if count<3 && moving {3} else {count};
+        let present=if count<3 && tooltip.is_some() {3} else {count};
         let g=gray(img);
         let tanks=(0..6).map(|i| {
             let r=crate::adaptive::tank(img,&g,&l,i,crate::scan_data());
