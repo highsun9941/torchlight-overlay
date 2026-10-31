@@ -33,6 +33,8 @@ pub struct Plan {
     pub tanks: Vec<Rect>,
     /// Failed card slots, outlined in blue for user-assisted enlarged OCR.
     pub inspect: Vec<(CardPos, f64, f64)>,
+    /// Unread counters or tank labels, in the same blue as assisted card inspection.
+    pub attention: Vec<Rect>,
 }
 
 impl Plan {
@@ -45,6 +47,7 @@ impl Plan {
         p.button = None;
         p.tanks.clear();
         p.inspect.clear();
+        p.attention.clear();
         p
     }
 }
@@ -242,6 +245,12 @@ pub fn render(plan: &Plan, w: u32, h: u32, fonts: &Fonts, accent: (u8, u8, u8)) 
     let mut pm = Pixmap::new(w.max(1), h.max(1)).unwrap();
     // sizes follow the screen's height, as the game's UI does (1440p is 1)
     let s = (h as f32 / 1440.0).max(0.6);
+
+    for r in &plan.attention {
+        if let Some(p)=rounded(r.x as f32,r.y as f32,r.w as f32,r.h as f32,8.0*s) {
+            glow(&mut pm,&p,Transform::identity(),s,(70,150,255));
+        }
+    }
 
     for (c,cw,ch) in &plan.inspect {
         let t=Transform::from_rotate(c.angle.to_degrees() as f32).post_translate(c.cx as f32,c.cy as f32);

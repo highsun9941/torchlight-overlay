@@ -395,6 +395,83 @@ pub fn encode_png(path: &std::path::Path, w: u32, h: u32, rgba: &[u8]) -> Result
 mod tests {
     use super::resumes;
 
+    fn round_ten(file:&str)->super::Img {
+        super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round10").join(file)).unwrap()
+    }
+    /// main() selects Korean before the reader runs. A child test process reproduces that setup
+    /// without racing other parallel tests by mutating their shared language environment.
+    fn production_korean_case(name:&str)->bool {
+        let name=format!("pipeline::tests::{name}");
+        if std::env::var("VORAX_REPLAY_CASE").ok().as_deref()==Some(name.as_str()) {return true;}
+        let output=std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact",name.as_str(),"--nocapture","--test-threads=1"])
+            .env("VORAX_LANGUAGE","ko").env("VORAX_OCR_MODE","accurate").env("VORAX_REPLAY_CASE",&name).output().unwrap();
+        assert!(output.status.success(),"Korean production replay failed:\n{}\n{}",String::from_utf8_lossy(&output.stdout),String::from_utf8_lossy(&output.stderr));
+        false
+    }
+    fn round_ten_ocr(third:&'static str)->impl FnMut(&super::Img)->String {
+        let (mut heading,mut middle)=(0,0);
+        move |img:&super::Img| {
+            if (img.width,img.height)==(464,120) {heading+=1;}
+            if (img.width,img.height)==(464,120) {match heading {1=>"혼합 거머리 용액",2=>"생•간 가루와",_=>third}.to_string()}
+            else {
+                middle+=1;
+                match middle {
+                    1=>"랜업1\n-터",
+                    2=>"성글 가루약\n런던 1 몬스터\n기근\n1 그&",
+                    _=>"'경골 가루약\n1 그륜 몬스터\n1 그&",
+                }.to_string()
+            }
+        }
+    }
+    #[test]
+    fn original_counter_survives_colour_correction_and_a_blank_counter_stays_unknown() {
+        use super::*;
+        for name in ["rest.png","middle-hover.png","rest-noisy.png"] {
+            let frame=round_ten(name);
+            for image in [frame.clone(),vorax_scan::pixels::resize(&frame,2050,881)] {
+                let r=scan(&image,scan_data(),true);
+                assert!(r.fields["refreshes"].sure,"{name}: {:?}",r.fields["refreshes"]);
+                assert_eq!(r.state.potion_refreshes,Some(0));assert_eq!(r.state.round,Some(10));
+            }
+        }
+        let mut frame=round_ten("rest.png");let l=layout_at(frame.width,frame.height,1.0);let band=l.refresh;
+        for y in band.y.floor() as usize..(band.y+band.h).ceil() as usize {
+            for x in band.x.floor() as usize..(band.x+band.w+100.0*l.k).ceil() as usize {
+                let at=(y*frame.width+x)*4;frame.data[at..at+4].copy_from_slice(&[20,20,20,255]);
+            }
+        }
+        let r=scan(&frame,scan_data(),true);assert!(!r.fields["refreshes"].sure,"absence must never be accepted as zero");
+    }
+    #[test]
+    fn the_reported_round_ten_offer_reaches_advice_without_a_counter_loop() {
+        use super::*;
+        if !production_korean_case("the_reported_round_ten_offer_reaches_advice_without_a_counter_loop") {return;}
+        let frame=round_ten("rest.png");let mut pipe=Pipeline::new(0);let mut text=round_ten_ocr("강력 이종 제거 가루와");
+        match pipe.run(&frame,None,Some(&mut text)) {
+            Outcome::Advice{reading,..}=>{
+                assert_eq!(reading.state.round,Some(10));assert_eq!(reading.state.potion_refreshes,Some(0));
+                assert_eq!(reading.state.hand,["Compound Leech Solution","Osteogenic Powder","Potent Xenopurge Powder"]);
+                assert!(reading.blocking_fields().is_empty());
+            },
+            Outcome::Uncertain{reading}=>panic!("round ten: {}",serde_json::to_string(&reading).unwrap()),
+            _=>panic!("the recorded offer must be readable"),
+        }
+        let mut no_repeat=|_:&Img|->String{panic!("confirmed round-ten cards should stay confirmed")};
+        assert!(matches!(pipe.run(&round_ten("rest-noisy.png"),None,Some(&mut no_repeat)),Outcome::Advice{..}));
+    }
+    #[test]
+    fn a_damaged_leading_modifier_requests_the_third_card_instead_of_the_base_powder() {
+        use super::*;
+        if !production_korean_case("a_damaged_leading_modifier_requests_the_third_card_instead_of_the_base_powder") {return;}
+        let mut pipe=Pipeline::new(0);let mut text=round_ten_ocr(",罔 이종 제거 가루와");
+        let result=pipe.run(&round_ten("rest.png"),None,Some(&mut text));
+        let Outcome::Uncertain{reading}=result else {panic!("a lost modifier must request enlargement")};
+        assert!(reading.fields["refreshes"].sure);assert!(!reading.fields["hand2"].sure);
+        assert_eq!(pipe.requested_slots(),[2]);assert!(reading.blocking_fields().contains(&"hand2".to_string()));
+        let feedback=crate::feedback::for_reading(&reading,&pipe.requested_slots());assert!(feedback.title.contains("3번 카드 이름"));
+    }
+
     fn round_eight(file:&str)->super::Img {
         let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round-memory").join(file)).unwrap();
         super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))

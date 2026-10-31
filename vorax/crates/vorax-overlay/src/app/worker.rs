@@ -220,13 +220,14 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                                     // Keep the last verified observation across a noisy OCR frame.
                                     // confirm_hover still requires the same slot/name within 2.5 seconds;
                                     // a missing popup or a real board change clears the candidate below.
-                                    status("확대 스캔 대기","파란 카드의 확대 내용을 보여 주세요. 후보가 겹치면 원래 카드에 마우스를 유지하세요.","제목·그림·카드 위치 확인 중");
+                                    status(&format!("{}번 카드 확대 확인 필요",requested[0]+1),"파란 카드의 확대 내용을 보여 주세요. 후보가 겹치면 원래 카드에 마우스를 유지하세요.",&pipe.progress());
                                 }
                             } else {
                                 pipe.cancel_hover_candidate();
                                 if last_hover_wait.elapsed()>=Duration::from_secs(3) {
                                     diagnostics::event(0,"hover_wait",serde_json::json!({"reason":if tip.is_none(){"tooltip_missing"}else{"ocr_unavailable"},"requested":requested,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0,"tooltipSearch":search}));
                                     if tip.is_none() {diagnostics::save(0,"tooltip_missing",&frame,None,pipe.pending(),&[],&[],serde_json::json!({"requested":requested,"tooltipSearch":search}));}
+                                    status(&format!("{}번 카드 확대 화면 대기",requested[0]+1),"파란 안내 카드에 마우스를 올려 왼쪽 확대 카드를 보여 주세요.",&pipe.progress());
                                     last_hover_wait=Instant::now();
                                 }
                             }
@@ -292,7 +293,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                 retries = 0;
                 let reason = if retry_reason == RetryReason::Animating { "cards still moving" } else { "unresolved screen fields" };
                 note(&format!("{reason} after {RETRIES} retries: advice withheld until the next scan"));
-                send(ToUi::Clear);
+                if retry_reason==RetryReason::Animating {send(ToUi::Clear);}
             }
             if pipe.wants_relook() {
                 relook_at = Some(Instant::now() + RELOOK);
@@ -429,15 +430,10 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
         Outcome::Uncertain { reading } => {
             let fields = reading.blocking_fields();
             note(&format!("{}: uncertain fields {}; reading {}", trigger.unwrap_or("manual"), fields.join(", "), serde_json::to_string(&reading).unwrap_or_default()));
-            let detail = fields.iter().map(|field| field_label(field)).collect::<Vec<_>>().join(", ");
-            if let Some(plan)=pipe.hover_plan() {
-                let size=reading.frame.as_ref().map_or((frame.width,frame.height),|f|(f.width,f.height));
-                let slot=pipe.requested_slots()[0]+1;
-                status("확대 스캔 요청",&format!("{slot}번 카드에 마우스를 올려 주세요. 이미 확인한 항목은 유지합니다."),&pipe.progress());
-                send(ToUi::Show(plan,size.0,size.1));
-            } else {
-                status("인식 확인 필요",&format!("확인할 항목: {detail}. Ctrl+Alt+X로 재시도할 수 있습니다."),&pipe.progress());send(ToUi::Clear);
-            }
+            let feedback=crate::feedback::for_reading(&reading,&pipe.requested_slots());
+            status(&feedback.title,&feedback.detail,&feedback.summary);
+            let size=reading.frame.as_ref().map_or((frame.width,frame.height),|f|(f.width,f.height));
+            send(ToUi::Show(feedback.plan,size.0,size.1));
         }
         Outcome::Animating => {
             if pipe.hover_dirty() {
@@ -468,22 +464,6 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
     }
     retry_reason
 }
-
-fn field_label(field: &str) -> String {
-    match field {
-        "round" => "라운드".into(),
-        "refreshes" => "새로고침 횟수".into(),
-        "hand" => "카드 선택지".into(),
-        f if f.starts_with("hand") => f[4..].parse::<usize>().map_or("카드 이름".into(), |n| format!("{}번 카드", n + 1)),
-        f if f.starts_with("tank") => {
-            let (n, stat) = f[4..].split_once('.').unwrap_or(("", ""));
-            let part = if stat == "activity" { "활성" } else { "수량" };
-            n.parse::<usize>().map_or("탱크 수치".into(), |n| format!("{}번 탱크 {part}", n + 1))
-        }
-        _ => "카드 이름".into(),
-    }
-}
-
 
 /// Local IPC snapshot for the companion window; no network service is involved.
 fn status(title: &str, detail: &str, state: &str) {

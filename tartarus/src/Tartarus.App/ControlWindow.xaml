@@ -215,7 +215,7 @@
           <TextBlock Text="포션, 수술 도구, 대상 배양 탱크를 함께 추천합니다." TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,8,0,18" />
           <Border Background="#213B3C" BorderBrush="#398F83" BorderThickness="1" CornerRadius="10" Padding="18">
             <StackPanel>
-              <TextBlock Text="현재 추천" Foreground="#83E0C8" FontSize="12" />
+              <TextBlock Text="현재 추천 / 인식 상태" Foreground="#83E0C8" FontSize="12" />
               <TextBlock x:Name="VoraxMove" Text="수술 준비 화면 대기" FontSize="20" FontWeight="Bold" TextWrapping="Wrap" Margin="0,10,0,8" />
               <TextBlock x:Name="VoraxDetail" Text="게임 로그와 화면을 연결하면 추천이 나타납니다." TextWrapping="Wrap" Foreground="#C4D4DE" />
             </StackPanel>
@@ -245,7 +245,7 @@
           </StackPanel>
           <TextBlock x:Name="VoraxStatus" Text="대기" TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,12,0,0" />
           <TextBlock Style="{StaticResource Section}" Text="표시 읽는 방법" />
-          <TextBlock Text="밝은 테두리: 추천 카드와 배양 탱크.&#10;84만 달성률: 현재 상태에서 시뮬레이션한 결과이며 성공 보장은 아닙니다.&#10;11~13라운드 수술 플랜: 전투 난이도와 보상을 직접 판단합니다." TextWrapping="Wrap" LineHeight="23" />
+          <TextBlock Text="밝은 테두리: 추천 카드와 배양 탱크.&#10;파란 테두리: 인식 확인이 필요한 카드·탱크·숫자 영역.&#10;84만 달성률: 현재 상태에서 시뮬레이션한 결과이며 성공 보장은 아닙니다.&#10;11~13라운드 수술 플랜: 전투 난이도와 보상을 직접 판단합니다." TextWrapping="Wrap" LineHeight="23" />
           <TextBlock Style="{StaticResource Section}" Text="단축키" />
           <TextBlock Text="Ctrl+Alt+X  다시 인식&#10;Ctrl+Alt+V  오버레이 숨김 / 표시" Foreground="#C4D4DE" LineHeight="23" />
           <TextBlock Text="자동 인식에는 게임 설정의 로그 활성화가 필요합니다. 창 모드 또는 테두리 없는 창 모드를 사용하세요." TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,20,0,0" />
