@@ -237,6 +237,7 @@
           </ComboBox>
           <TextBlock Text="CPU 사용" Margin="0,14,0,6" />
           <ComboBox x:Name="VoraxCpuCombo" SelectionChanged="CompanionSetting_Changed" />
+          <TextBlock Text="최대 성능은 모든 CPU 스레드와 추가 OCR 재인식을 사용합니다." TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,6,0,0" />
           <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
             <Button Content="다시 인식" Click="VoraxSnap_Click" />
             <Button x:Name="VoraxToggle" Content="일시정지" Click="VoraxToggle_Click" />

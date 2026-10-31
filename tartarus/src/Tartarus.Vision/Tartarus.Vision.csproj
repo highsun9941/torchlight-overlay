@@ -27,6 +27,8 @@
     <OcrModel Include="dict_en.txt" Url="https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt" Sha256="e025a66d31f327ba0c232e03f407ae8d105e1e709e7ccb3f408aa778c24e70d6" />
     <OcrModel Include="rec_eslav.onnx" Url="https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/eslav/rec.onnx" Sha256="dc6bf0e855247decce214ba6dae5bc135fa0ad725a5918a7fcfb59fad6c9cdee" />
     <OcrModel Include="dict_eslav.txt" Url="https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/eslav/dict.txt" Sha256="3e95f1581557162870cacdba5af91a4c6be2890710d395b0c3c7578e7ee5e6eb" />
+    <OcrModel Include="rec_korean.onnx" Url="https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/korean/rec.onnx" Sha256="322f140154c820fcb83c3d24cfe42c9ec70dd1a1834163306a7338136e4f1eaa" />
+    <OcrModel Include="dict_korean.txt" Url="https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/korean/dict.txt" Sha256="a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7" />
     <None Include="@(OcrModel->'$(OcrModelDir)%(Identity)')" Link="models\ocr\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="FetchOcrModels" BeforeTargets="BeforeBuild">

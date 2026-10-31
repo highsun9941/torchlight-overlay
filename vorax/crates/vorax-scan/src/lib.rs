@@ -21,3 +21,4 @@ pub use data::{scan_data, ScanData};
 pub use pixels::Img;
 pub use reading::Reading;
 pub use scan::{scan, scan_upstream};
+mod adaptive;

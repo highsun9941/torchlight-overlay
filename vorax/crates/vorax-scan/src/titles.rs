@@ -5,7 +5,7 @@
 use crate::cards::read_at;
 use crate::data::ScanData;
 use crate::layout::{card_face, layout_at, CardPos};
-use crate::pixels::{clamp_u8, patch, Img, Rect};
+use crate::pixels::{clamp_u8, dot, patch, resize, signature, Img, Rect};
 use crate::reading::{FieldRead, Fields, Problem, Reading};
 use std::collections::HashMap;
 
@@ -59,6 +59,46 @@ pub fn name_fit(name: &str, text: &str) -> f64 {
 const TITLE_AREA: Rect = Rect::new(-140.0, -110.0, 280.0, 150.0);
 const ZOOM: f64 = 2.0;
 const BLUR: usize = 8;
+
+/// A compact, high-confidence title-shape supplement for the reported Korean font. It can only
+/// disambiguate a name already supported by the card art; unknown titles continue through OCR.
+fn localized_refs() -> &'static std::collections::BTreeMap<String, Vec<Vec<f64>>> {
+    use std::sync::OnceLock;
+    static TITLES: OnceLock<std::collections::BTreeMap<String, Vec<Vec<f64>>>> = OnceLock::new();
+    TITLES.get_or_init(|| serde_json::from_str(include_str!("../../../data/scan/korean-titles.json")).expect("Korean title samples"))
+}
+
+pub fn localized_hand_geometry(img: &Img, l: &crate::layout::Layout) -> bool {
+    let candidates: Vec<_> = localized_refs().keys().map(|name| (name.clone(), 1.0)).collect();
+    l.cards.iter().filter(|card| localized_title(img, card, l.k, &candidates).is_some()).take(2).count() >= 2
+}
+
+pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f64)]) -> Option<(String, f64)> {
+    let refs = localized_refs();
+    if !candidates.iter().any(|(name, score)| *score >= ART_SUPPORT && refs.contains_key(name)) { return None; }
+    let mut scores: std::collections::BTreeMap<&String, f64> = std::collections::BTreeMap::new();
+    for (dx, dy) in [(0.0, 0.0), (-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)] {
+        let mut at = *c;
+        at.cx += dx * k;
+        at.cy += dy * k;
+        let crop = title_crop(img, &at, k);
+        let value = signature(&crop, Rect::new(30.0, 160.0, 500.0, 96.0), 64, 16);
+        for (name, samples) in refs {
+            let score = samples.iter().map(|v| dot(v, &value)).fold(f64::NEG_INFINITY, f64::max);
+            let old = scores.entry(name).or_insert(f64::NEG_INFINITY);
+            *old = old.max(score);
+        }
+    }
+    let mut ranked: Vec<_> = scores.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let (name, score) = ranked.first()?;
+    let second = ranked.get(1).map_or(0.0, |x| x.1);
+    (*score >= 0.94 && *score - second >= 0.06
+        && candidates.iter().any(|(n, s)| n == *name && *s >= ART_SUPPORT))
+        .then(|| ((*name).clone(), *score))
+}
+
+const ART_SUPPORT: f64 = 0.92;
 
 /// A card's title area, straightened and enlarged, as dark text on white.
 pub fn title_crop(img: &Img, c: &CardPos, k: f64) -> Img {
@@ -147,6 +187,17 @@ pub fn pictures(img: &Img, data: &ScanData, phase: &str, size: usize, slots: &[u
         .collect()
 }
 
+/// Production fallback for translated cards; original `pictures` stays available to the trace reader.
+pub fn pictures_adaptive(img: &Img, data: &ScanData, phase: &str, size: usize, slots: &[usize], hand_dy: f64, ui: f64) -> HashMap<usize, PictureRead> {
+    let l = layout_at(img.width, img.height, ui).shifted_hand(hand_dy);
+    let read = crate::cards::read_at_art(img, &l, size, phase, data, Some(slots));
+    slots.iter().map(|&j| {
+        let key = format!("hand{j}");
+        let unknown = read.problems.iter().any(|p| matches!(p, Problem::UnknownArt { field, .. } if *field == key));
+        (j, PictureRead { ranks: read.ranks[j].clone(), field: read.fields.get(&key).cloned(), unknown })
+    }).collect()
+}
+
 const PHASES: [&str; 3] = ["potion", "instrument", "protocol"];
 
 /// The reading with each card's printed name added. `read_text` reads a title crop (OCR); `pictures` matches
@@ -175,6 +226,19 @@ pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_tex
         if (gold_first || text.chars().any(crate::korean::hangul)) && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
             let other = read_text(&if gold_first { title_crop(img, c, l.k) } else { title_crop_gold(img, c, l.k, 70) });
             if phases.iter().any(|phase| settled(&ranked(data, phase, &other))) { return other; }
+        }
+        if std::env::var("VORAX_OCR_MODE").is_ok_and(|v| v == "accurate")
+            && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
+            let crop = title_crop(img, c, l.k);
+            for scale in [1.5, 2.0] {
+                let enlarged = resize(&crop, (crop.width as f64 * scale) as usize, (crop.height as f64 * scale) as usize);
+                let candidate = read_text(&enlarged);
+                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+            }
+            for threshold in [50, 90] {
+                let candidate = read_text(&title_crop_gold(img, c, l.k, threshold));
+                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+            }
         }
         text
     }).collect();

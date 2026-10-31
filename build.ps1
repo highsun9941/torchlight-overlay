@@ -29,6 +29,7 @@ if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed.' }
 Copy-Item -Path (Join-Path $taskRoot 'tartarus/models') -Destination $out -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'vorax/target/release/vorax-overlay.exe') -Destination $out -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.ko.md') -Destination (Join-Path $out 'README.ko.md') -Force
+Copy-Item -LiteralPath (Join-Path $taskRoot 'README.md') -Destination (Join-Path $out 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'VALIDATION.md') -Destination $out -Force
 $licenses = Join-Path $out 'licenses'
 New-Item -ItemType Directory -Path $licenses -Force | Out-Null

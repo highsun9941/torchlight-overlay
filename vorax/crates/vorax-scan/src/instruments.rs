@@ -119,6 +119,22 @@ pub struct InstrumentsRead {
 }
 
 pub fn read_instruments(img: &Img, l: &Layout, data: &ScanData) -> InstrumentsRead {
+    read_instruments_with(img, l, &data.icons)
+}
+
+pub fn read_instruments_adaptive(img: &Img, l: &Layout, data: &ScanData) -> InstrumentsRead {
+    use std::sync::OnceLock;
+    static ICONS: OnceLock<indexmap::IndexMap<String, Vec<Vec<f64>>>> = OnceLock::new();
+    let icons = ICONS.get_or_init(|| {
+        let mut icons = data.icons.clone();
+        let extra: indexmap::IndexMap<String, Vec<Vec<f64>>> = serde_json::from_str(include_str!("../../../data/scan/korean-panel.json")).expect("Korean panel samples");
+        for (name, samples) in extra { icons.entry(name).or_default().extend(samples); }
+        icons
+    });
+    read_instruments_with(img, l, icons)
+}
+
+fn read_instruments_with(img: &Img, l: &Layout, icons: &indexmap::IndexMap<String, Vec<Vec<f64>>>) -> InstrumentsRead {
     let mut from_right: Vec<String> = Vec::new();
     let mut reads: Vec<FieldRead> = Vec::new();
     let mut ranks_from_right: Ranks = Vec::new();
@@ -128,8 +144,7 @@ pub fn read_instruments(img: &Img, l: &Layout, data: &ScanData) -> InstrumentsRe
         }
         let p = signature(img, *r, 24, 24);
         let mut lined = HashMap::new();
-        let mut ranked: Vec<(String, f64)> = data
-            .icons
+        let mut ranked: Vec<(String, f64)> = icons
             .iter()
             .filter(|(n, _)| n.as_str() != "none")
             .map(|(n, vs)| (n.clone(), vs.iter().map(|v| icon_similarity(v, &p, &mut lined)).fold(f64::NEG_INFINITY, f64::max)))
@@ -150,6 +165,6 @@ pub fn read_instruments(img: &Img, l: &Layout, data: &ScanData) -> InstrumentsRe
     for (i, f) in reads.into_iter().enumerate() {
         fields.insert(format!("instrument{i}"), f);
     }
-    let known = data.icons.keys().filter(|n| n.as_str() != "none" && n.as_str() != STARTING_ITEM).cloned().collect();
+    let known = icons.keys().filter(|n| n.as_str() != "none" && n.as_str() != STARTING_ITEM).cloned().collect();
     InstrumentsRead { names: from_right, fields, ranks: ranks_from_right, known }
 }

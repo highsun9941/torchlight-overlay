@@ -98,7 +98,7 @@ pub fn read_phase(img: &Img, l: &Layout, data: &ScanData) -> (Option<String>, f6
 }
 
 /// Every known card ranked for one card position, best first.
-fn rank(img: &Img, c: &CardPos, k: f64, prefix: &str, data: &ScanData) -> Vec<(String, f64)> {
+fn rank(img: &Img, c: &CardPos, k: f64, prefix: &str, data: &ScanData, use_text: bool) -> Vec<(String, f64)> {
     use std::cell::RefCell;
     let arts: RefCell<HashMap<(i32, i32), std::rc::Rc<Art>>> = RefCell::new(HashMap::new());
     let txts: RefCell<HashMap<(i32, i32), std::rc::Rc<Vec<f64>>>> = RefCell::new(HashMap::new());
@@ -125,7 +125,7 @@ fn rank(img: &Img, c: &CardPos, k: f64, prefix: &str, data: &ScanData) -> Vec<(S
         .iter()
         .filter(|(key, _)| key.starts_with(prefix))
         .map(|(key, fs)| {
-            let texts = data.texts.get(key);
+            let texts = if use_text { data.texts.get(key) } else { None };
             let (mut best, mut at, mut a0) = (f64::NEG_INFINITY, (0.0, 0.0), 0.0);
             for &(dx, dy) in &sh {
                 let ar = art(dx, dy);
@@ -162,6 +162,15 @@ pub struct SlotsRead {
 }
 
 pub fn read_at(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData, slots: Option<&[usize]>) -> SlotsRead {
+    read_at_impl(img, l, size, phase, data, slots, true)
+}
+
+/// Card art is independent of the translated description. The old text-shape features are English.
+pub fn read_at_art(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData, slots: Option<&[usize]>) -> SlotsRead {
+    read_at_impl(img, l, size, phase, data, slots, false)
+}
+
+fn read_at_impl(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData, slots: Option<&[usize]>, use_text: bool) -> SlotsRead {
     let mut fields = Fields::new();
     let mut problems = Vec::new();
     let mut names = Vec::new();
@@ -173,18 +182,29 @@ pub fn read_at(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData,
     let ranked_all: Vec<Option<Vec<(String, f64)>>> = pos
         .par_iter()
         .enumerate()
-        .map(|(j, c)| if slots.is_some_and(|s| !s.contains(&j)) { None } else { Some(rank(img, c, l.k, &prefix, data)) })
+        .map(|(j, c)| if slots.is_some_and(|s| !s.contains(&j)) { None } else { Some(rank(img, c, l.k, &prefix, data, use_text)) })
         .collect();
     for (j, (c, ranked)) in pos.iter().zip(ranked_all).enumerate() {
-        let Some(ranked) = ranked else {
+        let Some(mut ranked) = ranked else {
             ranks.push(vec![]);
             continue;
         };
+        if !use_text {
+            if let Some((name, score)) = crate::titles::localized_title(img, c, l.k, &ranked[..ranked.len().min(5)]) {
+                ranked.retain(|(n, _)| n != &name);
+                ranked.insert(0, (name.clone(), score));
+                ranks.push(ranked.iter().take(KEEP_RANKS).cloned().collect());
+                names.push(name.clone());
+                fields.insert(format!("hand{j}"), FieldRead { sure: true, guess: Some(name), score: Some(score), second: None });
+                continue;
+            }
+        }
         ranks.push(ranked.iter().take(KEEP_RANKS).cloned().collect());
         let key = format!("hand{j}");
         let top = ranked.first();
         let second = ranked.get(1).map(|r| r.1);
-        if top.is_none_or(|t| t.1 < ART_UNKNOWN) {
+        let ambiguous_art = !use_text && top.is_some_and(|t| t.1 < ART_MIN || t.1 - second.unwrap_or(0.0) < ART_GAP);
+        if top.is_none_or(|t| t.1 < ART_UNKNOWN) || ambiguous_art {
             problems.push(Problem::UnknownArt { field: key.clone(), crop: card_face(c, l.k), hand: (size == 5).then_some(5), text: None });
             fields.insert(key, FieldRead { sure: false, guess: top.map(|t| t.0.clone()), score: top.map(|t| t.1), second });
             continue;
@@ -212,4 +232,24 @@ pub fn read_hand(img: &Img, l: &Layout, data: &ScanData) -> HandRead {
     let mut fields = head.fields;
     fields.extend(read.fields);
     HandRead { phase: Some(phase), names: read.names, fields, problems: read.problems, ranks: Some(read.ranks) }
+}
+
+/// A translated heading need not match the English header template. Compare the three offer types
+/// using language-independent art, and keep uncertain slots explicit for OCR to resolve.
+pub fn read_hand_adaptive(img: &Img, l: &Layout, data: &ScanData) -> HandRead {
+    let mut head = header_only(img, l, data);
+    let phases = ["potion", "instrument", "protocol"];
+    let mut best: Option<(String, SlotsRead, f64)> = None;
+    for phase in phases {
+        let size = if phase == "potion" { fan_size(img, l) } else { 3 };
+        let read = read_at_art(img, l, size, phase, data, None);
+        let verified_titles = read.fields.values().filter(|f| f.sure && f.second.is_none() && f.score.is_some()).count();
+        let score = read.ranks.iter().map(|r| r.first().map_or(0.0, |x| x.1)).sum::<f64>() / size as f64
+            + 0.05 * verified_titles as f64;
+        if best.as_ref().is_none_or(|(_, _, s)| score > *s) { best = Some((phase.to_owned(), read, score)); }
+    }
+    let (phase, read, _) = best.expect("at least one offer type");
+    head.fields.insert("phase".into(), FieldRead { sure: read.problems.is_empty(), guess: Some(phase.clone()), ..Default::default() });
+    head.fields.extend(read.fields);
+    HandRead { phase: Some(phase), names: read.names, fields: head.fields, problems: read.problems, ranks: Some(read.ranks) }
 }

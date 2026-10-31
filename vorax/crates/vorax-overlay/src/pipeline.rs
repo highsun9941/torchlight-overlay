@@ -7,7 +7,7 @@ use vorax_scan::layout::layout_at;
 use vorax_scan::live::carried_round;
 use vorax_scan::pixels::Img;
 use vorax_scan::reading::{Problem, Reading};
-use vorax_scan::titles::pictures;
+use vorax_scan::titles::pictures_adaptive as pictures;
 #[cfg(test)]
 use vorax_scan::titles::read_titles;
 use vorax_scan::track::{track_instruments, InstrumentTracker};
@@ -36,7 +36,7 @@ pub fn trustworthy(reading: &Reading) -> bool {
 pub enum Outcome {
     /// not the Surgical Preparation screen
     NotGame,
-    Uncertain,
+    Uncertain { reading: Box<Reading> },
     /// a card flying off as it's played: the last advice still stands
     Animating,
     /// the game closing after round 13's last pick (its end animation, the rewards): not a board
@@ -92,6 +92,13 @@ impl Pipeline {
             vorax::advisor::ScreenPhase::Instrument => {
                 if reading.fields.get("refreshes").is_some_and(|f| f.sure) {
                     self.instrument_refreshes = reading.state.instrument_refreshes;
+                } else if shelley_rerolls(self.shelley) == 0
+                    && reading.fields.get("refreshes").is_some_and(|f| f.guess.is_none()) {
+                    // With no pet rerolls the game omits this control entirely. An absent counter is
+                    // a known zero here, while a visible but unreadable digit still blocks advice.
+                    reading.state.instrument_refreshes = Some(0);
+                    reading.fields.insert("refreshes".into(), vorax_scan::reading::FieldRead { sure: true, guess: Some("0".into()), ..Default::default() });
+                    self.instrument_refreshes = Some(0);
                 }
             }
             _ => {
@@ -129,10 +136,29 @@ impl Pipeline {
         // with a text reader: the cards by their printed names, by their pictures only where a name doesn't settle
         let raw = match ocr {
             Some(read) => {
-                let names = scan(&img, data, false);
-                let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
-                let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
-                vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"))
+                // A title shape is only authoritative when every offered card is independently
+                // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
+                let localized = if std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko") {
+                    let pictured = scan(&img, data, true);
+                    let verified = !pictured.state.hand.is_empty()
+                        && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating))
+                        && pictured.state.hand.iter().enumerate().all(|(i, _)| {
+                        pictured.fields.get(&format!("hand{i}")).is_some_and(|f| f.sure && f.second.is_none() && f.score.is_some_and(|s| s >= 0.94))
+                    });
+                    verified.then_some(pictured)
+                } else { None };
+                if let Some(pictured) = localized { pictured } else {
+                    let names = scan(&img, data, false);
+                    let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
+                    let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
+                    let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
+                    if named.state.hand.is_empty() || named.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. })) {
+                        let pictured = scan(&img, data, true);
+                        if !pictured.state.hand.is_empty() && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating)) {
+                            pictured
+                        } else { named }
+                    } else { named }
+                }
             }
             None => scan(&img, data, true),
         };
@@ -176,7 +202,7 @@ impl Pipeline {
         reading.state.shelley = Some(self.shelley);
         self.fill_rerolls(&mut reading);
         let read_ms = t.elapsed().as_secs_f64() * 1000.0;
-        if !trustworthy(&reading) { return Outcome::Uncertain; }
+        if !trustworthy(&reading) { return Outcome::Uncertain { reading: Box::new(reading) }; }
         let (advice, cached) = self.advise(&reading.state);
         let l = layout_at(img.width, img.height, reading.ui()).shifted_hand(reading.hand_dy.unwrap_or(0.0));
         self.card_frames = crate::card_frame::detect(&img, &l, reading.state.hand.len());
@@ -321,6 +347,46 @@ mod tests {
         assert_eq!(first.ranking, second.ranking);
         pipe.shelley = 6;
         assert!(matches!(pipe.run(&frame, None, None), Outcome::Advice { cached: false, .. }));
+    }
+
+    #[test]
+    fn the_reported_korean_windows_produce_complete_advice_from_the_first_offer() {
+        use super::*;
+        for (file, round, hand, rerolls) in [
+            ("instrument-no-reroll.png", 1, vec!["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"], 0),
+            ("potion-round1.png", 1, vec!["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"], 3),
+            ("potion-round4-ultrawide.png", 4, vec!["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"], 1),
+        ] {
+            let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean").join(file)).unwrap();
+            let mut pipeline = Pipeline::new(0);
+            match pipeline.run(&frame, None, None) {
+                Outcome::Advice { reading, plan, .. } => {
+                    assert_eq!(reading.state.round, Some(round), "{file}");
+                    assert_eq!(reading.state.hand, hand, "{file}");
+                    assert!(reading.blocking_fields().is_empty(), "{file}");
+                    assert!(plan.pill.is_some(), "{file}: visible recommendation");
+                    let left = if reading.state.phase == vorax::advisor::ScreenPhase::Instrument { reading.state.instrument_refreshes } else { reading.state.potion_refreshes };
+                    assert_eq!(left, Some(rerolls), "{file}");
+                }
+                Outcome::Uncertain { reading } => panic!("{file}: {}", serde_json::to_string(&reading).unwrap()),
+                _ => panic!("{file}: expected a complete board"),
+            }
+        }
+    }
+
+    #[test]
+    fn verified_korean_titles_are_not_replaced_by_conflicting_os_ocr() {
+        use super::*;
+        let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean/potion-round4-ultrawide.png")).unwrap();
+        let mut calls = 0;
+        let mut text = |_: &Img| { calls += 1; "부화낭".to_string() };
+        let mut pipeline = Pipeline::new(0);
+        let result = pipeline.run(&frame, None, Some(&mut text));
+        match result {
+            Outcome::Advice { reading, .. } => assert_eq!(reading.state.hand, ["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"]),
+            _ => panic!("expected the verified Korean offer"),
+        }
+        assert_eq!(calls, 0);
     }
 
     #[test]

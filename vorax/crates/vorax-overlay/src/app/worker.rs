@@ -32,6 +32,9 @@ const GAME_LINE: &str = "TLLua: Display: [Game]";
 /// How long the game can be open without a game line before its log counts as off.
 const QUIET: Duration = Duration::from_secs(30);
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RetryReason { None, Animating, Uncertain }
+
 pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>) {
     unsafe {
         let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);
@@ -175,15 +178,16 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             // the look again after a pick, to settle the new icon: the board hasn't changed, so the marks stay up
             // while it reads and only change if what it finds does
             let quiet = relook && due.is_none() && !manual && again.is_none();
-            let animating = read(&capturer, ocr.as_ref(), &mut pipe, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
-            if !animating || quiet {
+            let retry_reason = read(&capturer, ocr.as_ref(), &mut pipe, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
+            if retry_reason == RetryReason::None || quiet {
                 retries = 0;
             } else if retries < RETRIES {
                 retries += 1;
                 retry = Some((Instant::now() + RETRY, trigger));
             } else {
                 retries = 0;
-                note(&format!("still a card in flight after {RETRIES} more looks: the marks are hidden until the next board"));
+                let reason = if retry_reason == RetryReason::Animating { "cards still moving" } else { "unresolved screen fields" };
+                note(&format!("{reason} after {RETRIES} retries: advice withheld until the next scan"));
                 send(ToUi::Clear);
             }
             if pipe.wants_relook() {
@@ -209,12 +213,12 @@ fn last_game_line_age(path: &Path) -> Option<Duration> {
 
 /// Takes a picture, reads it and advises; true when a card was in flight (nothing read).
 #[allow(clippy::too_many_arguments)]
-fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> bool {
+fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> RetryReason {
     let Some(game) = find_game_window() else {
         note("the game's window isn't open");
         status("게임 창 연결 대기", "토치라이트를 실행하세요.", "창 없음");
         send(ToUi::Clear);
-        return false;
+        return RetryReason::None;
     };
     if !quiet {
         status("화면 분석 중", "이전 추천 표시는 숨겼습니다.", "인식 및 시뮬레이션 중");
@@ -228,13 +232,13 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
             note("no picture from the game's window");
             status("화면을 읽지 못했습니다", "게임 창을 복원한 뒤 다시 인식하세요.", "캡처 실패");
             send(ToUi::Clear);
-            return false;
+            return RetryReason::None;
         }
         Err(e) => {
             note(&format!("capture failed: {e}"));
             status("화면을 읽지 못했습니다", "게임 창을 복원한 뒤 다시 인식하세요.", "캡처 실패");
             send(ToUi::Clear);
-            return false;
+            return RetryReason::None;
         }
     };
     let grabbed = t.elapsed().as_millis();
@@ -248,10 +252,14 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
         Outcome::Advice { .. } => "board",
         Outcome::Animating => "animating",
         Outcome::NotGame => "notgame",
-        Outcome::Uncertain => "uncertain",
+        Outcome::Uncertain { .. } => "uncertain",
         Outcome::Closing => "closing",
     };
-    let animating = matches!(outcome, Outcome::Animating | Outcome::Uncertain);
+    let retry_reason = match &outcome {
+        Outcome::Animating => RetryReason::Animating,
+        Outcome::Uncertain { .. } => RetryReason::Uncertain,
+        _ => RetryReason::None,
+    };
     match outcome {
         Outcome::Advice { reading, advice, plan, read_ms, cached } => {
             let title = plan.pill.as_ref().map_or("추천 없음", |p| p.main.as_str());
@@ -272,8 +280,11 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
         }
         // the board changed and a card is still moving: the marks stay hidden (the pill dimmed) while it looks again,
         // rather than the old ones blinking back between looks (2-3 flashes while long effects play out)
-        Outcome::Uncertain => {
-            status("인식 확인 필요", "카드나 수치를 확실히 읽지 못했습니다. 화면을 가린 창을 치우고 다시 인식하세요.", "추천 보류");
+        Outcome::Uncertain { reading } => {
+            let fields = reading.blocking_fields();
+            note(&format!("{}: uncertain fields {}; reading {}", trigger.unwrap_or("manual"), fields.join(", "), serde_json::to_string(&reading).unwrap_or_default()));
+            let detail = fields.iter().map(|field| field_label(field)).collect::<Vec<_>>().join(", ");
+            status("인식 확인 필요", &format!("확인할 항목: {detail}. 화면이 멈춘 뒤 다시 인식하세요."), "추천 보류");
             send(ToUi::Clear);
         }
         Outcome::Animating => {
@@ -298,7 +309,22 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
             note(&format!("frame not saved: {e}"));
         }
     }
-    animating
+    retry_reason
+}
+
+fn field_label(field: &str) -> String {
+    match field {
+        "round" => "라운드".into(),
+        "refreshes" => "새로고침 횟수".into(),
+        "hand" => "카드 선택지".into(),
+        f if f.starts_with("hand") => f[4..].parse::<usize>().map_or("카드 이름".into(), |n| format!("{}번 카드", n + 1)),
+        f if f.starts_with("tank") => {
+            let (n, stat) = f[4..].split_once('.').unwrap_or(("", ""));
+            let part = if stat == "activity" { "활성" } else { "수량" };
+            n.parse::<usize>().map_or("탱크 수치".into(), |n| format!("{}번 탱크 {part}", n + 1))
+        }
+        _ => "카드 이름".into(),
+    }
 }
 
 
