@@ -632,13 +632,23 @@ mod tests {
         assert_eq!(vorax_scan::hover::target(&read.name,&candidates,None),Some(0));
         let mut pipe=Pipeline::new(0);
         // Exercise the public production path. Calling apply_zoom directly would miss a wiring bug.
-        let mut failed_text=|_:&Img|"엉켜불은적골\n최소 2 그룹 해골\n경비병 보유 시,".to_string();
+        fn recorded_titles()->impl FnMut(&Img)->String {
+            let mut heading=0;
+            move |img:&Img| {
+                if (img.width,img.height)==(464,120) {
+                    heading+=1;
+                    match heading {1=>"엉켜“\n=츼골",2=>"비대한 늬하수체",_=>"오그라는 손가락"}.to_string()
+                } else {"엉켜불은적골\n최소 2 그룹 해골\n경비병 보유 시,".to_string()}
+            }
+        }
+        let mut failed_text=recorded_titles();
         let first=pipe.run(&frame,None,Some(&mut failed_text));
         assert!(matches!(first,Outcome::Uncertain{..}),"reported first title must request assistance");
-        assert!(pipe.requested_slots().contains(&0),"run must prepare the hover queue");
+        assert_eq!(pipe.requested_slots(),[0],"run must request only the failed title");
         assert!(pipe.hover_plan().is_some(),"an unresolved card needs the blue guide");
         assert!(!pipe.confirm_hover(0,&read,500.0));assert!(pipe.confirm_hover(0,&read,1000.0));
         assert!(!pipe.requested_slots().contains(&0));
+        let mut failed_text=recorded_titles();
         let result=pipe.run(&reported("board-before.png"),None,Some(&mut failed_text));
         match result {
             Outcome::Advice{reading,..} => {assert_eq!(reading.state.hand[0],"Adherent Metatarsals");assert!(reading.fields["hand0"].sure);},
