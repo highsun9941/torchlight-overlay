@@ -62,10 +62,19 @@ const BLUR: usize = 8;
 
 /// A compact, high-confidence title-shape supplement for the reported Korean font. It can only
 /// disambiguate a name already supported by the card art; unknown titles continue through OCR.
-pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f64)]) -> Option<(String, f64)> {
+fn localized_refs() -> &'static std::collections::BTreeMap<String, Vec<Vec<f64>>> {
     use std::sync::OnceLock;
     static TITLES: OnceLock<std::collections::BTreeMap<String, Vec<Vec<f64>>>> = OnceLock::new();
-    let refs = TITLES.get_or_init(|| serde_json::from_str(include_str!("../../../data/scan/korean-titles.json")).expect("Korean title samples"));
+    TITLES.get_or_init(|| serde_json::from_str(include_str!("../../../data/scan/korean-titles.json")).expect("Korean title samples"))
+}
+
+pub fn localized_hand_geometry(img: &Img, l: &crate::layout::Layout) -> bool {
+    let candidates: Vec<_> = localized_refs().keys().map(|name| (name.clone(), 1.0)).collect();
+    l.cards.iter().filter(|card| localized_title(img, card, l.k, &candidates).is_some()).take(2).count() >= 2
+}
+
+pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f64)]) -> Option<(String, f64)> {
+    let refs = localized_refs();
     if !candidates.iter().take(5).any(|(name, score)| *score >= ART_SUPPORT && refs.contains_key(name)) { return None; }
     let mut scores: std::collections::BTreeMap<&String, f64> = std::collections::BTreeMap::new();
     for (dx, dy) in [(0.0, 0.0), (-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)] {

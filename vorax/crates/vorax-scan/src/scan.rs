@@ -95,9 +95,11 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
     let (corrected_img, off, corrected) = normal_colours(captured, &data.levels, &read_areas(&l0));
     let (corrected_img, corrected) = if correct { (corrected_img, corrected) } else { (None, false) };
     let img = corrected_img.as_ref().unwrap_or(captured);
+    let korean = !upstream && (std::env::var("VORAX_LANGUAGE").is_ok_and(|v| v == "ko")
+        || crate::titles::localized_hand_geometry(img, &l0));
     let dy = match hand_dy {
         Some(d) => d,
-        None if !upstream && cards_present(img, &l0) == 3 => 0.0,
+        None if korean && cards_present(img, &l0) == 3 => 0.0,
         None => find_hand(img, &l0, data),
     };
     let l = l0.shifted_hand(dy);
@@ -108,15 +110,19 @@ pub fn scan_with(captured: &Img, data: &ScanData, pictures: bool, hand_dy: Optio
     if present == 1 || present == 2 {
         return bare(Problem::Animating);
     }
-    let hand = if present == 0 {
+    let mut hand = if present == 0 {
         let h = header_only(img, &l, data);
         crate::cards::HandRead { ranks: Some(vec![]), ..h }
     } else if pictures {
-        if upstream { read_hand(img, &l, data) }
+        if upstream || (!korean && header_only(img, &l, data).fields.get("phase").is_some_and(|f| f.sure)) { read_hand(img, &l, data) }
         else { crate::cards::read_hand_adaptive(img, &l, data) }
     } else {
         header_only(img, &l, data)
     };
+    if korean && !pictures {
+        // English heading templates cannot establish the phase of translated offers.
+        if let Some(phase) = hand.fields.get_mut("phase") { phase.sure = false; }
+    }
     let g = gray(img);
     use rayon::prelude::*;
     let tanks: Vec<_> = (0..6).into_par_iter().map(|i| {

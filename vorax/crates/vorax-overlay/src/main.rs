@@ -20,6 +20,7 @@ pub fn arg<T: std::str::FromStr>(args: &[String], name: &str) -> Option<T> {
 }
 
 fn main() {
+    if std::env::var_os("VORAX_LANGUAGE").is_none() { std::env::set_var("VORAX_LANGUAGE", "ko"); }
     if std::env::var_os("RAYON_NUM_THREADS").is_none() {
         let n = std::thread::available_parallelism().map_or(2, |n| n.get());
         std::env::set_var("RAYON_NUM_THREADS", (n / 2).clamp(1, 8).to_string());

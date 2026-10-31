@@ -245,7 +245,9 @@ pub fn read_hand_adaptive(img: &Img, l: &Layout, data: &ScanData) -> HandRead {
     for phase in phases {
         let size = if phase == "potion" { fan_size(img, l) } else { 3 };
         let read = read_at_art(img, l, size, phase, data, None);
-        let score = read.ranks.iter().map(|r| r.first().map_or(0.0, |x| x.1)).sum::<f64>() / size as f64;
+        let verified_titles = read.fields.values().filter(|f| f.sure && f.second.is_none() && f.score.is_some()).count();
+        let score = read.ranks.iter().map(|r| r.first().map_or(0.0, |x| x.1)).sum::<f64>() / size as f64
+            + 0.05 * verified_titles as f64;
         if best.as_ref().is_none_or(|(_, _, s)| score > *s) { best = Some((phase.to_owned(), read, score)); }
     }
     let (phase, read, _) = best.expect("at least one offer type");

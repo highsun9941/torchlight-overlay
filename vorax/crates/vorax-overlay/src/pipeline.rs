@@ -337,6 +337,31 @@ mod tests {
     }
 
     #[test]
+    fn the_reported_korean_windows_produce_complete_advice_from_the_first_offer() {
+        use super::*;
+        for (file, round, hand, rerolls) in [
+            ("instrument-no-reroll.png", 1, vec!["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"], 0),
+            ("potion-round1.png", 1, vec!["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"], 3),
+            ("potion-round4-ultrawide.png", 4, vec!["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"], 1),
+        ] {
+            let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean").join(file)).unwrap();
+            let mut pipeline = Pipeline::new(0);
+            match pipeline.run(&frame, None, None) {
+                Outcome::Advice { reading, plan, .. } => {
+                    assert_eq!(reading.state.round, Some(round), "{file}");
+                    assert_eq!(reading.state.hand, hand, "{file}");
+                    assert!(reading.blocking_fields().is_empty(), "{file}");
+                    assert!(plan.pill.is_some(), "{file}: visible recommendation");
+                    let left = if reading.state.phase == vorax::advisor::ScreenPhase::Instrument { reading.state.instrument_refreshes } else { reading.state.potion_refreshes };
+                    assert_eq!(left, Some(rerolls), "{file}");
+                }
+                Outcome::Uncertain { reading } => panic!("{file}: {}", serde_json::to_string(&reading).unwrap()),
+                _ => panic!("{file}: expected a complete board"),
+            }
+        }
+    }
+
+    #[test]
     fn the_screen_opened_again_mid_game_goes_on() {
         assert!(resumes(Some(6), Some(6)));
         assert!(resumes(Some(6), Some(7)));
