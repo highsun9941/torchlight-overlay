@@ -104,6 +104,7 @@ impl Reading {
             Problem::UnknownName { name } => Some(format!("card:{name}")),
             _ => None,
         }).collect();
+        fields.extend(self.fields.iter().filter(|(name, field)| name.starts_with("hand") && name[4..].parse::<usize>().is_ok() && !field.sure).map(|(name, _)| name.clone()));
         if self.state.hand.is_empty() { fields.push("hand".into()); }
         if self.state.phase != vorax::advisor::ScreenPhase::Protocol
             && !self.fields.get("refreshes").is_some_and(|f| f.sure) { fields.push("refreshes".into()); }

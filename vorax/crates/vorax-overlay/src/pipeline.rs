@@ -30,6 +30,7 @@ pub fn futures() -> u32 {
 pub fn trustworthy(reading: &Reading) -> bool {
     !reading.has(|p| matches!(p, Problem::Unreadable { .. } | Problem::UnknownArt { .. } | Problem::UnknownName { .. }))
         && !reading.state.hand.is_empty()
+        && !reading.fields.iter().any(|(name, field)| name.starts_with("hand") && name[4..].parse::<usize>().is_ok() && !field.sure)
         && (reading.state.phase == vorax::advisor::ScreenPhase::Protocol || reading.fields.get("refreshes").is_some_and(|f| f.sure))
 }
 
@@ -346,6 +347,21 @@ pub fn encode_png(path: &std::path::Path, w: u32, h: u32, rgba: &[u8]) -> Result
 #[cfg(test)]
 mod tests {
     use super::resumes;
+
+    #[test]
+    fn an_ambiguous_name_without_an_unknown_art_problem_still_requests_enlarged_ocr() {
+        use super::*;
+        let frame=decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean/potion-round6-ultrawide.png")).unwrap();
+        let img=windowed_game(&frame).map_or_else(||frame.clone(),|r|crop_to(&frame,&r));
+        let mut reading=scan(&img,scan_data(),true);
+        reading.problems.clear();
+        reading.fields.get_mut("hand1").unwrap().sure=false;
+        assert!(!trustworthy(&reading));
+        assert!(reading.blocking_fields().contains(&"hand1".to_string()));
+        let mut pipe=Pipeline::new(0);pipe.pending=Some(reading);
+        assert_eq!(pipe.requested_slots(),[1]);
+        assert_eq!(pipe.hover_plan().unwrap().inspect.len(),1);
+    }
 
     #[test]
     fn uncertain_input_never_produces_actionable_advice() {
