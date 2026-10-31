@@ -16,6 +16,8 @@ impl Stamp {
         let mut areas = vec![l.round, l.refresh];
         areas.extend(l.cards.iter().map(|c| card_face(c, l.k)));
         areas.extend([card_face(&l.hand5[0], l.k), card_face(&l.hand5[4], l.k)]);
+        // Identical potion art can hide a changed class suffix. Observe headings separately too.
+        areas.extend(l.cards.iter().chain(&l.hand5).map(|c| Rect::new(c.cx - 108.0 * l.k, c.cy - 38.0 * l.k, 216.0 * l.k, 44.0 * l.k)));
         areas.extend(l.total_band);
         areas.extend(l.aq_band);
         areas.extend(l.name_band);
@@ -26,19 +28,23 @@ impl Stamp {
 
     fn differs(&self, other: &Self, threshold: f32) -> bool {
         self.size != other.size || self.ui != other.ui || self.areas.iter().zip(&other.areas).any(|(a, b)| {
-            a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32 > threshold
+            let (sum, changed) = a.iter().zip(b).fold((0.0, 0usize), |(sum, count), (x, y)| {
+                let delta = (x - y).abs();
+                (sum + delta, count + usize::from(delta > 24.0))
+            });
+            sum / a.len() as f32 > threshold || changed * 100 > a.len()
         })
     }
 }
 
 /// Small colour thumbnails retain a changed digit or swapped potion without scanning full images.
 fn sample(img: &Img, r: &Rect) -> Vec<f32> {
-    let mut out = Vec::with_capacity(24 * 16 * 3);
+    let mut out = Vec::with_capacity(48 * 16 * 3);
     for y in 0..16 {
-        for x in 0..24 {
+        for x in 0..48 {
             let mut rgb = [0.0; 3];
             for (dx, dy) in [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)] {
-                let xx = (r.x + (x as f64 + dx) * r.w / 24.0).max(0.0).min(img.width.saturating_sub(1) as f64) as usize;
+                let xx = (r.x + (x as f64 + dx) * r.w / 48.0).max(0.0).min(img.width.saturating_sub(1) as f64) as usize;
                 let yy = (r.y + (y as f64 + dy) * r.h / 16.0).max(0.0).min(img.height.saturating_sub(1) as f64) as usize;
                 let (rr, gg, bb) = img.px(xx, yy);
                 for (v, c) in rgb.iter_mut().zip([rr, gg, bb]) { *v += c as f32 / 4.0; }
@@ -140,5 +146,21 @@ mod tests {
         assert_eq!(watch.observe(&scene, 1.0, 500.0), Change::Unchanged);
         assert!(watch.reset());
         assert_eq!(watch.observe(&scene, 1.0, 1000.0), Change::Changed);
+    }
+
+    #[test]
+    fn a_small_heading_suffix_change_is_not_diluted_by_unchanged_card_art() {
+        let mut a = Img::new(960, 540);
+        a.data.fill(40);
+        let mut b = a.clone();
+        let l = layout_at(960, 540, 1.0);
+        fill(&mut b, Rect::new(l.cards[1].cx + 15.0 * l.k, l.cards[1].cy - 24.0 * l.k, 22.0 * l.k, 16.0 * l.k), 150);
+        let mut watch = ScreenWatch::default();
+        watch.accept(&a, 1.0);
+        assert_eq!(watch.observe(&b, 1.0, 500.0), Change::Changed);
+        let mut noise = a.clone();
+        noise.data.fill(42);
+        watch.accept(&a, 1.0);
+        assert_eq!(watch.observe(&noise, 1.0, 1000.0), Change::Unchanged);
     }
 }

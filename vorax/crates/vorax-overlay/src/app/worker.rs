@@ -289,6 +289,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
         let still_current = capturer.grab(game).ok().flatten().is_some_and(|latest| !watch.differs(&latest, pipe.ui()));
         if !still_current {
             pipe.invalidate();
+            watch.reset();
             status("화면 변경 감지", "분석 중 화면이 바뀌어 자동으로 다시 읽습니다.", "이전 추천 숨김");
             send(ToUi::Clear);
             note("screen changed during recognition: stale advice discarded");
