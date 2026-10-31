@@ -101,7 +101,6 @@ struct State {
     visible: bool,
     /// the game's log, once the worker has looked; whether its help card has shown by itself this run
     game_log: Option<GameLog>,
-    log_help_shown: bool,
     /// to send itself what the update's download thread finds
     to_self: Sender<ToUi>,
     /// a newer release, and how far its download is
@@ -158,7 +157,7 @@ pub fn create(fonts: Fonts, rx: Receiver<ToUi>, to_self: Sender<ToUi>, tx: Sende
         let _ = Shell_NotifyIconW(NIM_ADD, &nid);
         SetTimer(hwnd, TIMER_FOLLOW, 250, None);
         STATE.with(|s| {
-            *s.borrow_mut() = Some(State { hwnd, fonts: Rc::new(fonts), rx, tx, plan: None, busy: false, frame: (0, 0), settings, placed: None, visible: false, game_log: None, log_help_shown: false, to_self, update: None, updating: None, args });
+            *s.borrow_mut() = Some(State { hwnd, fonts: Rc::new(fonts), rx, tx, plan: None, busy: false, frame: (0, 0), settings, placed: None, visible: false, game_log: None, to_self, update: None, updating: None, args });
         });
         Ok(Waker(Hwnd::of(hwnd)))
     }
@@ -212,10 +211,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
                         },
                         ToUi::GameLog(g) => {
                             s.game_log = Some(g);
-                            // the steps by the tray, once a run, the first time the log turns out off
-                            if g == GameLog::Off && !std::mem::replace(&mut s.log_help_shown, true) {
-                                log_card(s, true);
-                            }
                         }
                         ToUi::Update(r) => {
                             s.update = Some(r);
@@ -338,11 +333,11 @@ fn tray_menu(hwnd: HWND) {
         match s.game_log {
             Some(GameLog::On) => rows.push(Row::Text("게임 로그 연결됨 / 자동 인식".into())),
             Some(GameLog::Off) => {
-                rows.push(Row::Warn("게임 로그 꺼짐 / 수동 인식만 가능".into()));
+                rows.push(Row::Text("로그 이벤트 대기 / 화면 변화로 자동 인식".into()));
                 rows.push(Row::Action { id: MENU_LOG_HELP, label: "게임 로그 켜는 방법".into(), shortcut: String::new() });
             }
             Some(GameLog::Missing) => {
-                rows.push(Row::Warn("UE_game.log를 찾지 못했습니다".into()));
+                rows.push(Row::Text("로그 미연결 / 화면 변화로 자동 인식".into()));
                 rows.push(Row::Action { id: MENU_LOG_HELP, label: "연결 방법".into(), shortcut: String::new() });
             }
             Some(GameLog::Checking) => rows.push(Row::Text("게임 로그 확인 중".into())),
@@ -369,7 +364,7 @@ fn tray_menu(hwnd: HWND) {
 fn log_card(s: &State, by_tray: bool) {
     let rows = if s.game_log == Some(GameLog::Missing) {
         vec![
-            Row::Header { title: "게임 로그 미발견".into(), status: "자동 인식에는 게임 로그가 필요합니다.".into() },
+            Row::Header { title: "게임 로그 미발견".into(), status: "화면 변화로 자동 인식 중입니다.".into() },
             Row::Text("도우미의 로그 선택에서 UE_game.log를 지정하세요.".into()),
             Row::Text("게임 폴더의 Saved\\Logs 안에 있습니다.".into()),
             Row::Text("Ctrl+Alt+X로 수동 인식할 수 있습니다.".into()),
@@ -377,7 +372,7 @@ fn log_card(s: &State, by_tray: bool) {
         ]
     } else {
         vec![
-            Row::Header { title: "게임 로그 켜기".into(), status: "로그를 켜면 자동 인식할 수 있습니다.".into() },
+            Row::Header { title: "게임 로그 켜기".into(), status: "로그를 연결하면 화면 감지를 보완합니다.".into() },
             Row::Text("1. 게임에서 Esc를 누르세요.".into()),
             Row::Text("2. 계정 관련 설정을 여세요.".into()),
             Row::Text("3. 로그 활성화를 켜세요.".into()),

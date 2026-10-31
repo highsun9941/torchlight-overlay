@@ -1,8 +1,8 @@
 # 검증 기록
 
-## 이 저장소의 1.1.0
+## 이 저장소의 1.1.1
 
-현재 포크의 검증은 [GitHub Actions](https://github.com/highsun9941/torchlight-overlay/actions/workflows/verify.yml)에서 수행합니다. 제공된 한국어 창 세 장의 라운드·탱크·새로고침과 카드 판독, 원본 추적 회귀, Windows UI 및 실행용 패키지를 검사합니다. 아래 기록은 기반으로 사용한 원본 1.0/1.0.1의 과거 검증 기록입니다.
+현재 포크의 검증은 [GitHub Actions](https://github.com/highsun9941/torchlight-overlay/actions/workflows/verify.yml)에서 수행합니다. 제공된 한국어 창 네 장의 라운드·탱크·새로고침과 카드 판독, 원본 추적 회귀, Windows UI 및 실행용 패키지를 검사합니다. 장면 전환은 게임 로그가 없는 상태의 화면 재생, 분석 중 변경된 화면 거부, 동일한 인식 실패의 무한 반복 방지를 검사합니다. 실제 사용자의 PC에서 실시간 캡처를 실행한 검증은 아닙니다. 아래 기록은 기반으로 사용한 원본 1.0/1.0.1의 과거 검증 기록입니다.
 
 2026-10-31, Windows x64, 1920x1080 SDR, 한국어 게임. 원본 설치 폴더는 변경하지 않았다.
 

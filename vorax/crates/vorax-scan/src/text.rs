@@ -319,6 +319,50 @@ pub struct TextRead {
     pub alts: Vec<Vec<char>>,
 }
 
+/// A padded, enlarged round counter for the existing Windows OCR engine. Include the /13 suffix
+/// as an independent check; a bare OCR digit must agree with the glyph reader's plausible candidate.
+pub fn round_ocr_crop(img: &Img, l: &crate::layout::Layout) -> Img {
+    let mut r = l.round;
+    r.w *= 1.8;
+    let mut p = crate::pixels::crop(img, r);
+    for px in p.data.chunks_exact_mut(4) {
+        let (_, s, v) = hsv(px[0], px[1], px[2]);
+        let ink = (s > 0.2 && v > 0.45 && px[0] >= px[1] && px[1] >= px[2]) || (s < 0.25 && v > 0.4);
+        px.copy_from_slice(&[if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, 255]);
+    }
+    let p = crate::pixels::resize(&p, p.width * 3, p.height * 3);
+    let mut out = Img::new(p.width + 32, p.height + 32);
+    out.data.fill(255);
+    for y in 0..p.height {
+        let at = ((y + 16) * out.width + 16) * 4;
+        out.data[at..at + p.width * 4].copy_from_slice(&p.data[y * p.width * 4..(y + 1) * p.width * 4]);
+    }
+    out
+}
+
+pub fn ocr_round(text: &str, guess: Option<&str>, score: f64) -> Option<i32> {
+    let text: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+    let number = if let Some((n, "13")) = text.split_once('/') { n.parse::<i32>().ok()? }
+        else if score >= 0.6 && guess == Some(text.as_str()) { text.parse::<i32>().ok()? }
+        else { return None };
+    (1..=13).contains(&number).then_some(number)
+}
+
+#[cfg(test)]
+mod round_ocr_tests {
+    use super::ocr_round;
+    #[test]
+    fn round_ocr_needs_a_valid_fraction_or_agreeing_independent_reader() {
+        assert_eq!(ocr_round("6 / 13", None, 0.0), Some(6));
+        assert_eq!(ocr_round("12/13", Some("2"), 0.6), Some(12));
+        assert_eq!(ocr_round("6", Some("6"), 0.69), Some(6));
+        for text in ["8", "13", "99/13", "0/13", "6/18", "6xx", ""] {
+            assert_eq!(ocr_round(text, Some("6"), 0.69), None, "{text}");
+        }
+        assert_eq!(ocr_round("6", Some("6"), 0.5), None);
+    }
+}
+
 /// The characters in a rect, with the mean best and runner-up match scores (1 = identical).
 pub fn read_text(img: &Img, g: &[f32], r: &Rect, kind: TextKind, refs: &IndexMap<String, Vec<Vec<f64>>>) -> Option<TextRead> {
     let gs = glyphs(img, r, kind);

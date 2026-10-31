@@ -104,6 +104,24 @@ const ART_SUPPORT: f64 = 0.92;
 pub fn title_crop(img: &Img, c: &CardPos, k: f64) -> Img {
     let r = Rect::new(TITLE_AREA.x * ZOOM, TITLE_AREA.y * ZOOM, TITLE_AREA.w * ZOOM, TITLE_AREA.h * ZOOM);
     let p = patch(img, c.cx, c.cy, c.angle, r, k / ZOOM);
+    contrast(&p)
+}
+
+/// Read the heading alone: an icon or the brighter description must not determine its contrast or OCR lines.
+/// White padding helps Windows OCR keep the clipped right edge and short Hangul names on one line.
+pub fn heading_crop(img: &Img, c: &CardPos, k: f64) -> Img {
+    let r = Rect::new(-216.0, -76.0, 432.0, 88.0);
+    let p = contrast(&patch(img, c.cx, c.cy, c.angle, r, k / ZOOM));
+    let mut out = Img::new(p.width + 32, p.height + 32);
+    out.data.fill(255);
+    for y in 0..p.height {
+        let at = ((y + 16) * out.width + 16) * 4;
+        out.data[at..at + p.width * 4].copy_from_slice(&p.data[y * p.width * 4..(y + 1) * p.width * 4]);
+    }
+    out
+}
+
+fn contrast(p: &Img) -> Img {
     let (w, h) = (p.width, p.height);
     let g: Vec<f32> = (0..w * h).map(|i| p.data[i * 4].max(p.data[i * 4 + 1]).max(p.data[i * 4 + 2]) as f32).collect();
     let mut sum = vec![0f64; (w + 1) * (h + 1)];
@@ -221,7 +239,16 @@ pub fn read_titles_styled(img: &Img, reading: Reading, data: &ScanData, read_tex
     };
     let phases: Vec<&str> = if reading.fields.get("phase").is_some_and(|f| f.sure) { vec![header] } else { PHASES.to_vec() };
     let size = if read > 0 { read } else { reading.hand_size.unwrap_or(3) };
-    let texts: Vec<String> = l.hand_at(size).iter().map(|c| {
+    let texts: Vec<String> = l.hand_at(size).iter().enumerate().map(|(j, c)| {
+        if gold_first {
+            if let Some(name) = reading.fields.get(&format!("hand{j}"))
+                .filter(|f| f.sure && f.second.is_none() && f.score.is_some_and(|s| s >= 0.94))
+                .and_then(|f| f.guess.as_deref()) {
+                return crate::korean::name(name).to_string();
+            }
+            let heading = read_text(&heading_crop(img, c, l.k));
+            if phases.iter().any(|phase| settled(&ranked(data, phase, &heading))) { return heading; }
+        }
         let text = read_text(&if gold_first { title_crop_gold(img, c, l.k, 70) } else { title_crop(img, c, l.k) });
         if (gold_first || text.chars().any(crate::korean::hangul)) && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
             let other = read_text(&if gold_first { title_crop(img, c, l.k) } else { title_crop_gold(img, c, l.k, 70) });

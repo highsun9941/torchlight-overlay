@@ -55,6 +55,7 @@ pub struct Pipeline {
     /// the last board advised on, with the size of its picture, for advising again when a setting changes (and
     /// for its round, when the next board's can't be read)
     last: Option<(Reading, usize, usize)>,
+    last_current: bool,
     /// this game reached the Surgical Protocols (rounds 11-13): a board after them with no cards in hand is the game
     /// closing (its end animation, the rewards). Read as a board it gave six 1횞1 monsters in "round 1"; round 13's
     /// own board may not be read first (caught mid-animation, or its number read as 12)
@@ -82,8 +83,13 @@ pub fn shelley_rerolls(level: i32) -> i32 {
 
 impl Pipeline {
     pub fn new(shelley: i32) -> Pipeline {
-        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, protocols: false, resumed: false }
+        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, protocols: false, resumed: false }
     }
+
+    pub fn ui(&self) -> f64 { self.last.as_ref().map_or(1.0, |(r, ..)| r.ui()) }
+
+    /// Keep history for tracking rounds, but never re-display a plan after its screen changed.
+    pub fn invalidate(&mut self) { self.last_current = false; }
 
     /// The board's instrument rerolls: as read on an instrument offer, else carried from the last one this game,
     /// else what the Shelley level starts a game with. (Upstream counts them as 0 on a potion board.)
@@ -111,6 +117,7 @@ impl Pipeline {
 
     /// The last board advised again (the Shelley level changed): its marks, for a picture of this size.
     pub fn readvise(&mut self) -> Option<(Plan, usize, usize)> {
+        if !self.last_current { return None; }
         let (mut reading, w, h) = self.last.clone()?;
         reading.state.shelley = Some(self.shelley);
         if reading.state.phase != vorax::advisor::ScreenPhase::Instrument {
@@ -127,6 +134,7 @@ impl Pipeline {
     /// `frame`: the captured game window; `trigger`: "screen" when the log says a new game opened.
     pub fn run(&mut self, frame: &Img, trigger: Option<&str>, ocr: TextReader) -> Outcome {
         let t = std::time::Instant::now();
+        self.invalidate();
         self.resumed = false;
         let data = scan_data();
         let img = match windowed_game(frame) {
@@ -138,17 +146,16 @@ impl Pipeline {
             Some(read) => {
                 // A title shape is only authoritative when every offered card is independently
                 // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
-                let localized = if std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko") {
-                    let pictured = scan(&img, data, true);
-                    let verified = !pictured.state.hand.is_empty()
+                let localized = std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko");
+                let pictured = localized.then(|| scan(&img, data, true));
+                let verified = pictured.as_ref().is_some_and(|pictured| !pictured.state.hand.is_empty()
                         && !pictured.has(|p| matches!(p, Problem::UnknownArt { .. } | Problem::UnknownName { .. } | Problem::NotFound | Problem::Animating))
                         && pictured.state.hand.iter().enumerate().all(|(i, _)| {
                         pictured.fields.get(&format!("hand{i}")).is_some_and(|f| f.sure && f.second.is_none() && f.score.is_some_and(|s| s >= 0.94))
-                    });
-                    verified.then_some(pictured)
-                } else { None };
-                if let Some(pictured) = localized { pictured } else {
-                    let names = scan(&img, data, false);
+                    }));
+                let mut result = if verified { pictured.unwrap() } else {
+                    // Preserve independently verified slots even when another card still needs OCR.
+                    let names = pictured.unwrap_or_else(|| scan(&img, data, false));
                     let (dy, ui) = (names.hand_dy.unwrap_or(0.0), names.ui());
                     let pics = |phase: &str, size: usize, slots: &[usize]| pictures(&img, data, phase, size, slots, dy, ui);
                     let named = vorax_scan::titles::read_titles_styled(&img, names, data, read, Some(&pics), std::env::var("VORAX_LANGUAGE").map_or(true, |v| v == "ko"));
@@ -158,7 +165,16 @@ impl Pipeline {
                             pictured
                         } else { named }
                     } else { named }
+                };
+                if let Some(field) = result.fields.get("round").filter(|f| !f.sure) {
+                    let text = read(&vorax_scan::text::round_ocr_crop(&img, &layout_at(img.width, img.height, result.ui())));
+                    if let Some(n) = vorax_scan::text::ocr_round(&text, field.guess.as_deref(), field.score.unwrap_or(0.0)) {
+                        result.state.round = Some(n);
+                        result.fields.insert("round".into(), vorax_scan::reading::FieldRead { sure: true, guess: Some(n.to_string()), ..Default::default() });
+                        result.problems.retain(|p| !matches!(p, Problem::Unreadable { field } if field == "round"));
+                    }
                 }
+                result
             }
             None => scan(&img, data, true),
         };
@@ -209,6 +225,7 @@ impl Pipeline {
         let mut plan = plan_for(&advice, &reading.state, &reading, &l);
         self.align_card(&mut plan, &advice);
         self.last = Some((reading.clone(), img.width, img.height));
+        self.last_current = true;
         Outcome::Advice { reading: Box::new(reading), advice: Box::new(advice), plan, read_ms, cached }
     }
 
@@ -356,6 +373,7 @@ mod tests {
             ("instrument-no-reroll.png", 1, vec!["Incubation Sac", "Hypertrophic Pituitary", "Contracted Claws"], 0),
             ("potion-round1.png", 1, vec!["Spinal Solution - Aemberon", "Slender-Limb Powder - Pest", "Anesthetic Tincture - Aemberon"], 3),
             ("potion-round4-ultrawide.png", 4, vec!["Osteolytic Ointment", "Twin Hormone - Pest", "Potion Kit (Small)"], 1),
+            ("potion-round6-ultrawide.png", 6, vec!["Digestive Enzyme Solution", "Spinal Solution - Aemberon", "Viscous Bile Solution"], 1),
         ] {
             let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean").join(file)).unwrap();
             let mut pipeline = Pipeline::new(0);
@@ -387,6 +405,37 @@ mod tests {
             _ => panic!("expected the verified Korean offer"),
         }
         assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn visual_round_transition_without_log_input_invalidates_the_previous_plan() {
+        use super::*;
+        use vorax_scan::watch::{Change, ScreenWatch};
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/korean");
+        let client = |file: &str| {
+            let frame = decode_png(&root.join(file)).unwrap();
+            windowed_game(&frame).map_or_else(|| frame.clone(), |r| crop_to(&frame, &r))
+        };
+        let a = client("potion-round4-ultrawide.png");
+        let b = client("potion-round6-ultrawide.png");
+        // Hold the capture size fixed: the change detector must notice the board, not just resizing.
+        let same_size = vorax_scan::pixels::resize(&b, a.width, a.height);
+        let mut pipe = Pipeline::new(1);
+        assert!(matches!(pipe.run(&a, None, None), Outcome::Advice { .. }));
+        let mut watch = ScreenWatch::default();
+        watch.accept(&a, pipe.ui());
+        assert_eq!(watch.observe(&same_size, pipe.ui(), 500.0), Change::Changed);
+        pipe.invalidate();
+        assert!(pipe.readvise().is_none(), "a settings change cannot resurrect the old recommendation");
+        assert_eq!(watch.observe(&same_size, pipe.ui(), 1000.0), Change::Ready);
+        let Outcome::Advice { reading, .. } = pipe.run(&b, None, None) else { panic!("new screen must read without a log event or hotkey") };
+        assert_eq!(reading.state.round, Some(6));
+        assert_eq!(reading.state.hand[1], "Spinal Solution - Aemberon");
+        watch.accept(&b, pipe.ui());
+        assert_eq!(watch.observe(&b, pipe.ui(), 1500.0), Change::Unchanged);
+        assert!(pipe.readvise().is_some());
+        assert!(matches!(pipe.run(&Img::new(960, 540), None, None), Outcome::NotGame));
+        assert!(pipe.readvise().is_none(), "a failed read must also invalidate the visible plan");
     }
 
     #[test]
