@@ -73,8 +73,8 @@ fn preview(input: &std::path::Path, output: &std::path::Path, shelley: i32, acce
     };
     eprintln!("total {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     // a windowed capture's marks sit inside its frame
-    let (ox, oy) = vorax_scan::window::windowed_game(&frame).map_or((0, 0), |a| (a.x as usize, a.y as usize));
-    let (gw, gh) = vorax_scan::window::windowed_game(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
+    let (ox, oy) = vorax_scan::window::game_view(&frame).map_or((0, 0), |a| (a.x as usize, a.y as usize));
+    let (gw, gh) = vorax_scan::window::game_view(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
     let overlay = draw::render(&plan, gw as u32, gh as u32, &fonts, draw::accent(accent));
     let mut out = frame.data.clone();
     let src = overlay.data();

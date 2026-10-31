@@ -109,7 +109,7 @@ pub fn title_crop(img: &Img, c: &CardPos, k: f64) -> Img {
 
 /// Read the heading alone: an icon or the brighter description must not determine its contrast or OCR lines.
 /// White padding helps Windows OCR keep the clipped right edge and short Hangul names on one line.
-pub fn heading_crop(img: &Img, c: &CardPos, k: f64) -> Img {
+fn legacy_heading_crop(img: &Img, c: &CardPos, k: f64) -> Img {
     let r = Rect::new(-216.0, -76.0, 432.0, 88.0);
     let p = contrast(&patch(img, c.cx, c.cy, c.angle, r, k / ZOOM));
     let mut out = Img::new(p.width + 32, p.height + 32);
@@ -120,6 +120,98 @@ pub fn heading_crop(img: &Img, c: &CardPos, k: f64) -> Img {
     }
     out
 }
+
+fn filter_line(p:&[u8],w:usize,h:usize,horizontal:bool,maximum:bool)->Vec<u8> {
+    let mut out=vec![0;w*h];
+    for y in 0..h {for x in 0..w {
+        let at=if horizontal{x}else{y};let bound=if horizontal{w}else{h};
+        let mut value:u8=if maximum{0}else{255};
+        for q in at.saturating_sub(8)..=(at+8).min(bound-1) {
+            let v=p[if horizontal{y*w+q}else{q*w+x}];
+            value=if maximum{value.max(v)}else{value.min(v)};
+        }
+        out[y*w+x]=value;
+    }}out
+}
+
+fn ink_threshold(p:&[u8])->u8 {
+    let mut hist=[0.0;256];for &v in p {hist[v as usize]+=1.0;}
+    let total: f64=hist.iter().enumerate().map(|(i,n)|i as f64*n).sum();
+    let (mut count,mut sum,mut best,mut at)=(0.0,0.0,0.0,0);
+    for (i,n) in hist.iter().enumerate() {
+        count+=n;sum+=i as f64*n;let rest=p.len() as f64-count;
+        if count==0.0 || rest==0.0 {continue;}
+        let delta=sum/count-(total-sum)/rest;let score=count*rest*delta*delta;
+        if score>best {best=score;at=i;}
+    }(at as f64*0.7).max(8.0) as u8
+}
+
+/// Locate a text row on each captured frame. Hover raises a card and slides its neighbours, so the
+/// old fixed heading can land on a description. Opening removes the smooth background without
+/// subtracting the dense middle strokes of Hangul as the old local mean did.
+pub fn located_heading(img:&Img,c:&CardPos,k:f64,enlarged:bool)->(Img,Rect) {
+    let r=if enlarged{Rect::new(-216.0,-100.0,432.0,88.0)}else{Rect::new(-320.0,-210.0,640.0,340.0)};
+    let p=patch(img,c.cx,c.cy,c.angle,r,k/2.0);let (w,h)=(p.width,p.height);
+    let gray:Vec<u8>=p.data.chunks_exact(4).map(|v|v[0].min(v[1])).collect();
+    let opened=filter_line(&filter_line(&filter_line(&filter_line(&gray,w,h,true,false),w,h,false,false),w,h,true,true),w,h,false,true);
+    let lift:Vec<u8>=gray.iter().zip(opened).map(|(v,b)|v.saturating_sub(b)).collect();
+    let threshold=ink_threshold(&lift);
+    let mut rows=Vec::new();let (mut start,mut last,mut active)=(0,0,false);
+    for y in 0..h {
+        // Rim pixels at either side must not join all text rows into one component.
+        let hits=(w/5..w*4/5).filter(|&x|lift[y*w+x]>=threshold).count();
+        if (hits as f64)<(w as f64*0.025).max(10.0) {continue;}
+        if !active || y-last>4 {if active {rows.push((start,last+1));} start=y;active=true;}
+        last=y;
+    }
+    if active {rows.push((start,last+1));}
+    let target=if enlarged{-48.0}else{-80.0}-r.y;
+    rows.sort_by(|(a,b),(aa,bb)| (((a+b) as f64/2.0-target).abs()).total_cmp(&(((aa+bb) as f64/2.0-target).abs())));
+    let mut found=None;
+    for (top,bottom) in rows {
+        let center=r.y+(top+bottom) as f64/2.0;
+        if !(8..=70).contains(&(bottom-top)) || (!enlarged && !(-150.0..=70.0).contains(&center)) {continue;}
+        let (top,bottom)=(top.saturating_sub(4),(bottom+4).min(h));
+        let mut columns=Vec::new();let (mut start,mut last,mut active)=(0,0,false);
+        for x in 0..w {
+            if !(top..bottom).any(|y|lift[y*w+x]>=threshold) {continue;}
+            if !active || (x-last) as f64>((bottom-top) as f64*0.9).max(6.0) {
+                if active {columns.push((start,last+1));}start=x;active=true;
+            }
+            last=x;
+        }
+        if active {columns.push((start,last+1));}
+        let word=columns.into_iter().filter(|(a,b)| {
+            if ((b-a) as f64)<(bottom-top) as f64*1.6 {return false;}
+            let (mut groups,mut previous,mut pixels)=(0,false,0usize);
+            for x in *a..*b {
+                let count=(top..bottom).filter(|&y|lift[y*w+x]>=threshold).count();
+                let current=count>0;if current && !previous {groups+=1;}previous=current;pixels+=count;
+            }
+            groups>=3 && pixels as f64/((b-a)*(bottom-top)) as f64>=0.06
+        }).min_by_key(|(a,b)|(a+b).abs_diff(w));
+        if let Some((left,right))=word {found=Some((left.saturating_sub(12),top,(right+12).min(w),bottom));break;}
+    }
+    let Some((left,top,right,bottom))=found else {return (legacy_heading_crop(img,c,k),Rect::new(c.cx-108.0*k,c.cy-38.0*k,216.0*k,44.0*k));};
+    let mut values=Vec::new();for y in top..bottom {values.extend_from_slice(&lift[y*w+left..y*w+right]);}
+    let mut ranked=values.clone();ranked.sort_unstable();let high=ranked[ranked.len()*95/100].max(16) as f64;
+    let mut text=Img::new(right-left,bottom-top);
+    for (i,&v) in values.iter().enumerate() {
+        let pixel=if (v as f64)<threshold as f64*0.5 {255}else{clamp_u8(255.0-v as f64*400.0/high)};
+        text.data[i*4..i*4+4].copy_from_slice(&[pixel,pixel,pixel,255]);
+    }
+    let scale=(432.0/text.width as f64).min(88.0/text.height as f64);
+    let text=resize(&text,(text.width as f64*scale).round().max(1.0) as usize,(text.height as f64*scale).round().max(1.0) as usize);
+    let mut out=Img::new(464,120);out.data.fill(255);
+    let (ox,oy)=((out.width-text.width)/2,(out.height-text.height)/2);
+    for y in 0..text.height {
+        let to=((oy+y)*out.width+ox)*4;out.data[to..to+text.width*4].copy_from_slice(&text.data[y*text.width*4..(y+1)*text.width*4]);
+    }
+    let local=Rect::new((r.x+left as f64)*k/2.0,(r.y+top as f64)*k/2.0,(right-left) as f64*k/2.0,(bottom-top) as f64*k/2.0);
+    (out,Rect::new(c.cx+local.x*c.angle.cos()-local.y*c.angle.sin(),c.cy+local.x*c.angle.sin()+local.y*c.angle.cos(),local.w,local.h))
+}
+
+pub fn heading_crop(img:&Img,c:&CardPos,k:f64)->Img {located_heading(img,c,k,false).0}
 
 fn contrast(p: &Img) -> Img {
     let (w, h) = (p.width, p.height);

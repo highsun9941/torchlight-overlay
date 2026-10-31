@@ -18,6 +18,7 @@ impl Stamp {
     fn new(img: &Img, ui: f64, hovered: Option<usize>) -> Self {
         let l = layout_at(img.width, img.height, ui);
         let tooltip=crate::hover::tooltip(img).map(|t|t.rect);
+        let moving=tooltip.is_some() || hovered.is_some();
         let mut areas = Vec::new();
         let mut add = |name: String, r: Rect, text: bool, ignored: bool| {
             let covered=tooltip.is_some_and(|t|r.x<t.x+t.w && r.x+r.w>t.x && r.y<t.y+t.h && r.y+r.h>t.y);
@@ -30,8 +31,8 @@ impl Stamp {
         for (i, c) in l.hand_at(size).iter().enumerate() {
             // Enlarging one offer also slides its neighbours. Round, refreshes, validated tanks and
             // the instrument panel still detect actual actions while this temporary fan motion is masked.
-            add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, tooltip.is_some() || hovered == Some(i));
-            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, tooltip.is_some() || hovered == Some(i));
+            add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, moving);
+            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, moving);
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
         let count=crate::cards::cards_present(img,&l);
@@ -43,7 +44,7 @@ impl Stamp {
                 && r.fields.get(&format!("tank{i}.quantity")).is_some_and(|f|f.sure))
                 .and_then(|m|serde_json::to_string(&m).ok())
         }).collect();
-        Self { size:(img.width,img.height),ui,present,tooltip:tooltip.is_some(),areas,tanks }
+        Self { size:(img.width,img.height),ui,present,tooltip:moving,areas,tanks }
     }
     fn differences(&self, other: &Self) -> Vec<Difference> {
         if self.size != other.size || self.ui != other.ui || self.areas.len()!=other.areas.len() {
@@ -98,15 +99,16 @@ fn sample(img:&Img,r:&Rect,text:bool)->Vec<f32> {
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum Change { Unchanged, Changed, Waiting, Ready }
 #[derive(Default)]
-pub struct ScreenWatch { accepted:Option<Stamp>, pending:Option<(Stamp,f64)>, hovered:Option<usize>, pub last_difference:Vec<Difference> }
+pub struct ScreenWatch { accepted:Option<Stamp>, pending:Option<(Stamp,f64)>, hovered:Option<usize>, had_hover:bool, pub last_difference:Vec<Difference> }
 impl ScreenWatch {
     pub fn set_hover(&mut self, slot:Option<usize>) { self.hovered=slot; }
     pub fn observe(&mut self,img:&Img,ui:f64,now_ms:f64)->Change {
         let stamp=Stamp::new(img,ui,self.hovered);
+        let leaving=self.had_hover && !stamp.tooltip;self.had_hover=stamp.tooltip;
         if let Some(old)=&mut self.accepted {
             // Leaving the popup restores the entire fan. Rebase only those pixels, once, so the
             // worker keeps confirmed names for its finishing read; genuine counters still compare.
-            if old.tooltip && !stamp.tooltip {
+            if leaving {
                 for area in &mut old.areas {if area.name.starts_with("hand") {
                     if let Some(now)=stamp.areas.iter().find(|a|a.name==area.name) {*area=now.clone();}
                 }}
@@ -123,6 +125,7 @@ impl ScreenWatch {
     }
     pub fn accept(&mut self,img:&Img,ui:f64) {
         let mut stamp=Stamp::new(img,ui,self.hovered);
+        self.had_hover=stamp.tooltip;
         if let Some(old)=&self.accepted {
             for a in &mut stamp.areas { if a.ignored { if let Some(b)=old.areas.iter().find(|b|b.name==a.name) {a.values=b.values.clone();} } }
             for (new,before) in stamp.tanks.iter_mut().zip(&old.tanks) {if new.is_none() {*new=before.clone();}}

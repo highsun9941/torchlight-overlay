@@ -26,3 +26,5 @@ Additional modifications in 1.2.0: user-assisted enlarged-card OCR, blue unresol
 Additional modifications in 1.2.1: verified tank-state change detection, glyph-row name colours, unique tooltip-to-slot routing without a foreground prerequisite, and regression inputs from user diagnostics. No new runtime dependency.
 
 1.2.2 fork modifications add disconnected blue tooltip edge fitting, stable hover change detection and regression fixtures; no third-party runtime dependencies are added.
+
+1.2.3 fork modifications add per-frame title-row localization, Hangul-preserving background removal, bounded unique title-fragment matching and regression captures. No third-party runtime dependencies are added.

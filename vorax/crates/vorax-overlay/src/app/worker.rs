@@ -216,7 +216,9 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                                         if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
                                     } else {status("확대 스캔 확인 중",&format!("{}번 확대 카드 내용을 한 번 더 확인합니다.",slot+1),"같은 이름 두 번 확인");}
                                 } else {
-                                    pipe.cancel_hover_candidate();
+                                    // Keep the last verified observation across a noisy OCR frame.
+                                    // confirm_hover still requires the same slot/name within 2.5 seconds;
+                                    // a missing popup or a real board change clears the candidate below.
                                     status("확대 스캔 대기","파란 카드의 확대 내용을 보여 주세요. 후보가 겹치면 원래 카드에 마우스를 유지하세요.","제목·그림·카드 위치 확인 중");
                                 }
                             } else {
@@ -416,7 +418,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
                 advice.ms,
                 serde_json::to_string(&reading.state).unwrap_or_default()
             ));
-            let (w, h) = vorax_scan::window::windowed_game(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
+            let (w, h) = vorax_scan::window::game_view(&frame).map_or((frame.width, frame.height), |a| (a.w as usize, a.h as usize));
             send(ToUi::Show(plan, w, h));
         }
         // the board changed and a card is still moving: the marks stay hidden (the pill dimmed) while it looks again,
