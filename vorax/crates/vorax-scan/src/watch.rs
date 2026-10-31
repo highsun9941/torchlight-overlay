@@ -1,5 +1,5 @@
 //! Compare named UI regions by shape, with hover motion and the left-hand tooltip excluded.
-use crate::layout::{card_face, layout_at};
+use crate::layout::layout_at;
 use crate::pixels::{gray, Img, Rect};
 
 #[derive(Clone)]

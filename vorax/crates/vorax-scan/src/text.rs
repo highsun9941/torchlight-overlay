@@ -325,6 +325,12 @@ pub fn round_ocr_crop(img: &Img, l: &crate::layout::Layout) -> Img {
     let mut r = l.round;
     r.w *= 1.8;
     r.h *= 1.15;
+    let gs=glyphs(img,&l.round,TextKind::Round);
+    if !gs.is_empty() {
+        let top=gs.iter().map(|g|g.y).fold(f64::INFINITY,f64::min);
+        let bottom=gs.iter().map(|g|g.y+g.h).fold(f64::NEG_INFINITY,f64::max);
+        r.y=top-4.0*l.k;r.h=(bottom-top)*1.35+8.0*l.k;
+    }
     let mut p = crate::pixels::crop(img, r);
     let peak=p.data.chunks_exact(4).filter(|px|px[0]>px[2].saturating_add(15) && px[0]>=px[1] && px[1]>=px[2])
         .map(|px|lum(px[0],px[1],px[2])).fold(0.0f64,f64::max);
@@ -333,7 +339,7 @@ pub fn round_ocr_crop(img: &Img, l: &crate::layout::Layout) -> Img {
     let threshold=(peak*0.45).max(25.0);
     for px in p.data.chunks_exact_mut(4) {
         let (_, s, v) = hsv(px[0], px[1], px[2]);
-        let ink = lum(px[0],px[1],px[2])>threshold && ((s>0.2 && v>0.2 && px[0]>=px[1] && px[1]>=px[2]) || s<0.28);
+        let ink = lum(px[0],px[1],px[2])>threshold && ((s>0.2 && v>0.2 && px[0]>=px[1] && px[1]>=px[2]) || s<0.10);
         px.copy_from_slice(&[if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, 255]);
     }
     let p = crate::pixels::resize(&p, p.width * 3, p.height * 3);

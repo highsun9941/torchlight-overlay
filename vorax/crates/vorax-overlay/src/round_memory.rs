@@ -28,7 +28,7 @@ mod tests {
         next.problems.push(Problem::Unreadable{field:"tank0.activity".into()});
         memory.restore(&mut next);
         assert!(sure(&next,"round"));assert_eq!(next.state.round,Some(8));
-        assert_eq!(next.state.tanks[0],first.state.tanks[0]);assert!(!sure(&next,"hand1"));
+        assert_eq!(tank_value(&next,0),tank_value(&first,0));assert!(!sure(&next,"hand1"));
         assert_eq!(memory.names().keys().copied().collect::<Vec<_>>(),[0,2]);
         assert!(memory.reused.contains(&"round".to_string()));assert!(memory.reused.contains(&"tank0.activity".to_string()));
         next.fields.get_mut("hand1").unwrap().sure=true;next.problems.clear();memory.remember(&next);
@@ -56,6 +56,9 @@ fn sure(r: &Reading, field: &str) -> bool { r.fields.get(field).is_some_and(|f| 
 fn tank_known(r: &Reading, i: usize) -> bool {
     sure(r, &format!("tank{i}.empty")) || ["rarity", "archetype", "activity", "quantity"].iter().all(|part| sure(r, &format!("tank{i}.{part}")))
 }
+fn tank_value(r:&Reading,i:usize)->Option<(vorax::types::Archetype,vorax::types::Rarity,i64,i64)> {
+    r.state.tanks.get(i).and_then(|m|m.as_ref()).map(|m|(m.archetype,m.rarity,m.activity,m.quantity))
+}
 fn hand_size(r: &Reading) -> usize { r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3), |h| h.len().max(3)) }
 fn refreshes(r: &Reading) -> Option<i32> {
     if r.state.phase == vorax::advisor::ScreenPhase::Potion { r.state.potion_refreshes } else { r.state.instrument_refreshes }
@@ -82,7 +85,7 @@ impl RoundMemory {
             || (sure(old,"phase") && sure(current,"phase") && old.state.phase != current.state.phase)
             || (sure(old,"refreshes") && sure(current,"refreshes") && (old.state.phase != current.state.phase || refreshes(old) != refreshes(current)))
             || hand_size(old) != hand_size(current)
-            || (0..6).any(|i| tank_known(old,i) && tank_known(current,i) && old.state.tanks.get(i) != current.state.tanks.get(i))
+            || (0..6).any(|i| tank_known(old,i) && tank_known(current,i) && tank_value(old,i) != tank_value(current,i))
             || (0..hand_size(current)).any(|i| {
                 let field = format!("hand{i}");
                 sure(old,&field) && sure(current,&field) && old.fields[&field].guess != current.fields[&field].guess

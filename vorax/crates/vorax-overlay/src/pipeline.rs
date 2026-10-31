@@ -225,7 +225,7 @@ impl Pipeline {
             None => frame.clone(),
         };
         // with a text reader: the cards by their printed names, by their pictures only where a name doesn't settle
-        let mut raw = match ocr {
+        let raw = match ocr {
             Some(read) => {
                 // A title shape is only authoritative when every offered card is independently
                 // supported by its art. These calibrated Korean titles need no OS-dependent OCR.
