@@ -18,6 +18,8 @@ impl Stamp {
         areas.extend([card_face(&l.hand5[0], l.k), card_face(&l.hand5[4], l.k)]);
         areas.extend(l.total_band);
         areas.extend(l.aq_band);
+        areas.extend(l.name_band);
+        areas.extend(l.icon);
         areas.extend(l.instrument_icon);
         Self { size: (img.width, img.height), ui, areas: areas.iter().map(|r| sample(img, r)).collect() }
     }
@@ -124,7 +126,7 @@ mod tests {
     fn digits_rerolls_and_panel_changes_are_watched_but_scene_animation_is_not() {
         let a = Img::new(960, 540);
         let l = layout_at(960, 540, 1.0);
-        for area in [l.round, l.refresh, l.total_band[1], l.aq_band[2], l.instrument_icon[0]] {
+        for area in [l.round, l.refresh, l.total_band[1], l.aq_band[2], l.name_band[0], l.icon[1], l.instrument_icon[0]] {
             let mut b = a.clone();
             fill(&mut b, area, 100);
             let mut watch = ScreenWatch::default();

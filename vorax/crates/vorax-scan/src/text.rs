@@ -327,7 +327,7 @@ pub fn round_ocr_crop(img: &Img, l: &crate::layout::Layout) -> Img {
     let mut p = crate::pixels::crop(img, r);
     for px in p.data.chunks_exact_mut(4) {
         let (_, s, v) = hsv(px[0], px[1], px[2]);
-        let ink = s > 0.2 && v > 0.45 && px[0] >= px[1] && px[1] >= px[2];
+        let ink = (s > 0.2 && v > 0.45 && px[0] >= px[1] && px[1] >= px[2]) || (s < 0.25 && v > 0.4);
         px.copy_from_slice(&[if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, if ink { 0 } else { 255 }, 255]);
     }
     let p = crate::pixels::resize(&p, p.width * 3, p.height * 3);

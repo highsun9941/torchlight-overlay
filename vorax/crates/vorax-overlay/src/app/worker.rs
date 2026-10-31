@@ -187,6 +187,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                     },
                     _ => {
                         pipe.invalidate();
+                        watch.reset();
+                        status("화면 연결 대기", "게임 창을 복원하면 자동으로 다시 읽습니다.", "캡처 대기");
                         send(ToUi::Clear);
                     }
                 }
@@ -247,7 +249,9 @@ fn last_game_line_age(path: &Path) -> Option<Duration> {
 /// Takes a picture, reads it and advises; true when a card was in flight (nothing read).
 #[allow(clippy::too_many_arguments)]
 fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut ScreenWatch, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> RetryReason {
+    pipe.invalidate();
     let Some(game) = find_game_window() else {
+        watch.reset();
         note("the game's window isn't open");
         status("게임 창 연결 대기", "토치라이트를 실행하세요.", "창 없음");
         send(ToUi::Clear);
@@ -262,12 +266,14 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
     let frame = match frame {
         Ok(Some(f)) => f,
         Ok(None) => {
+            watch.reset();
             note("no picture from the game's window");
             status("화면을 읽지 못했습니다", "게임 창을 복원한 뒤 다시 인식하세요.", "캡처 실패");
             send(ToUi::Clear);
             return RetryReason::None;
         }
         Err(e) => {
+            watch.reset();
             note(&format!("capture failed: {e}"));
             status("화면을 읽지 못했습니다", "게임 창을 복원한 뒤 다시 인식하세요.", "캡처 실패");
             send(ToUi::Clear);
