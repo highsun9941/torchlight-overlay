@@ -16,6 +16,7 @@ pub mod titles;
 pub mod korean;
 pub mod track;
 pub mod window;
+pub mod watch;
 
 pub use data::{scan_data, ScanData};
 pub use pixels::Img;

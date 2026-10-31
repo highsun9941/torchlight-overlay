@@ -18,3 +18,5 @@ Torchlight: Infinite names, text, pictures and recognition templates belong to t
 Modifications in this distribution: Korean UI and OCR aliases; portable configuration; content engine switching; local-only diagnostics; uncertain-reading suppression; configurable futures and bounded CPU parallelism. Existing game engines and trained values are preserved.
 
 Additional modifications in 1.1.0: bounded numeric-region recovery with product validation; translated-card art fallback; one supplemental Korean round-number glyph; zero-reroll instrument-screen handling; maximum CPU/OCR mode; production-path diagnostics and detailed unresolved-input logs. No new runtime package dependency is introduced.
+
+Additional modifications in 1.1.1: log-independent visual change detection, stale-advice invalidation, isolated Korean title OCR and validated round-counter OCR fallback, and supplemental samples from a reported round-6 frame. No runtime dependency added.

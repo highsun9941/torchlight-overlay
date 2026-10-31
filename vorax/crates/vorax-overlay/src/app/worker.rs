@@ -1,5 +1,5 @@
-//! The worker thread: follows the game's log, and when it says the board changed (and the animations have
-//! settled), takes a picture of the game, reads it, asks the advisor and hands the marks to the window.
+//! Watches the static screen UI as well as the game's log. Changed screens clear old advice immediately;
+//! a stable screen is read once, even when the game stops writing board events.
 
 use super::capture::Capturer;
 use super::ocr::Ocr;
@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 use vorax_scan::live::{log_time, Follower, Settler, Trigger};
+use vorax_scan::watch::{Change, ScreenWatch};
 
 pub struct Options {
     pub log: Option<PathBuf>,
@@ -25,6 +26,7 @@ const RELOOK: Duration = Duration::from_millis(1500);
 /// hidden (the board they were for is gone, and no log line may come to say when the new one has landed).
 const RETRY: Duration = Duration::from_millis(700);
 const RETRIES: u32 = 3;
+const VISUAL_POLL: Duration = Duration::from_millis(500);
 
 /// A line the game writes only with its log on (Esc → Account Related → Enable Log): with it on, one comes at
 /// least every ~10 s (pings, sounds, clicks); with it off, only a few as the game starts.
@@ -68,6 +70,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         note(&format!("saving every picture read to {}", dir.display()));
     }
     let mut pipe = Pipeline::new(opts.shelley);
+    let mut watch = ScreenWatch::default();
+    let mut last_visual_poll = Instant::now() - VISUAL_POLL;
     let mut follower: Option<Follower> = None;
     let mut looked_for_log = Instant::now() - Duration::from_secs(60);
     let mut settler = Settler::default();
@@ -133,6 +137,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             }
             if settler.over && !was_over {
                 note("the game's Vorax screen closed");
+                pipe.invalidate();
                 status("수술 준비 화면 대기", "다음 화면을 기다립니다.", "보드 닫힘");
                 send(ToUi::Clear);
                 retry = None;
@@ -152,9 +157,9 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             };
             if game_log != Some(state) {
                 match state {
-                    GameLog::On => note("the game's log has game lines: boards are read by themselves"),
-                    GameLog::Off => note("the game is open but its log has no game lines for 30 s: Enable Log is off (Esc → Account Related)"),
-                    GameLog::Missing => note("the game's log isn't there"),
+                    GameLog::On => note("the game's log has game lines: log and visual change detection are active"),
+                    GameLog::Off => note("no game log events for 30 s: visual change detection remains active"),
+                    GameLog::Missing => note("the game's log isn't there: visual change detection remains active"),
                     _ => {}
                 }
                 game_log = Some(state);
@@ -164,21 +169,49 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         let due = settler.due(now_ms());
         let relook = relook_at.is_some_and(|t| Instant::now() >= t);
         let again = retry.filter(|(t, _)| Instant::now() >= *t);
-        if due.is_some() || manual || relook || again.is_some() {
+        let mut visual = false;
+        if last_visual_poll.elapsed() >= VISUAL_POLL && !manual && due.is_none() && !relook && again.is_none() {
+            last_visual_poll = Instant::now();
+            if let Some(game) = find_game_window() {
+                match capturer.grab(game) {
+                    Ok(Some(frame)) => match watch.observe(&frame, pipe.ui(), now_ms()) {
+                        Change::Changed => {
+                            pipe.invalidate();
+                            retry = None;
+                            relook_at = None;
+                            status("화면 변경 감지", "화면이 안정되면 자동으로 다시 읽습니다.", "이전 추천 숨김");
+                            send(ToUi::Clear);
+                        }
+                        Change::Ready => visual = true,
+                        _ => {}
+                    },
+                    _ => {
+                        pipe.invalidate();
+                        send(ToUi::Clear);
+                    }
+                }
+            } else if watch.reset() {
+                pipe.invalidate();
+                status("게임 창 연결 대기", "토치라이트를 실행하세요.", "창 없음");
+                send(ToUi::Clear);
+            }
+        }
+        if due.is_some() || manual || relook || again.is_some() || visual {
             relook_at = None;
             retry = None;
             let trigger = match due {
                 Some(Trigger::Screen) => Some("screen"),
                 Some(_) => Some("board"),
+                None if visual => Some("visual"),
                 None => again.and_then(|(_, t)| t),
             };
-            if due.is_some() || manual {
+            if due.is_some() || manual || visual {
                 retries = 0;
             }
             // the look again after a pick, to settle the new icon: the board hasn't changed, so the marks stay up
             // while it reads and only change if what it finds does
-            let quiet = relook && due.is_none() && !manual && again.is_none();
-            let retry_reason = read(&capturer, ocr.as_ref(), &mut pipe, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
+            let quiet = relook && due.is_none() && !manual && again.is_none() && !visual;
+            let retry_reason = read(&capturer, ocr.as_ref(), &mut pipe, &mut watch, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
             if retry_reason == RetryReason::None || quiet {
                 retries = 0;
             } else if retries < RETRIES {
@@ -213,7 +246,7 @@ fn last_game_line_age(path: &Path) -> Option<Duration> {
 
 /// Takes a picture, reads it and advises; true when a card was in flight (nothing read).
 #[allow(clippy::too_many_arguments)]
-fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> RetryReason {
+fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut ScreenWatch, trigger: Option<&str>, now: bool, quiet: bool, frames: Option<&Path>, send: &dyn Fn(ToUi)) -> RetryReason {
     let Some(game) = find_game_window() else {
         note("the game's window isn't open");
         status("게임 창 연결 대기", "토치라이트를 실행하세요.", "창 없음");
@@ -245,6 +278,17 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
     let mut read_text = |img: &vorax_scan::pixels::Img| ocr.and_then(|o| o.read(img).ok()).unwrap_or_default();
     let reader: crate::pipeline::TextReader = if ocr.is_some() { Some(&mut read_text) } else { None };
     let outcome = pipe.run(&frame, trigger, reader);
+    watch.accept(&frame, pipe.ui());
+    if matches!(&outcome, Outcome::Advice { .. }) {
+        let still_current = capturer.grab(game).ok().flatten().is_some_and(|latest| !watch.differs(&latest, pipe.ui()));
+        if !still_current {
+            pipe.invalidate();
+            status("화면 변경 감지", "분석 중 화면이 바뀌어 자동으로 다시 읽습니다.", "이전 추천 숨김");
+            send(ToUi::Clear);
+            note("screen changed during recognition: stale advice discarded");
+            return RetryReason::Animating;
+        }
+    }
     if pipe.resumed {
         note("the Vorax screen opened again on the game under way: it goes on (instruments kept)");
     }
@@ -284,7 +328,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, trigger: Op
             let fields = reading.blocking_fields();
             note(&format!("{}: uncertain fields {}; reading {}", trigger.unwrap_or("manual"), fields.join(", "), serde_json::to_string(&reading).unwrap_or_default()));
             let detail = fields.iter().map(|field| field_label(field)).collect::<Vec<_>>().join(", ");
-            status("인식 확인 필요", &format!("확인할 항목: {detail}. 화면이 멈춘 뒤 다시 인식하세요."), "추천 보류");
+            status("인식 확인 필요", &format!("확인할 항목: {detail}. 화면 변경 시 자동으로 다시 읽습니다. Ctrl+Alt+X로 재시도할 수 있습니다."), "추천 보류");
             send(ToUi::Clear);
         }
         Outcome::Animating => {
