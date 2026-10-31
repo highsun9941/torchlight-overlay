@@ -405,16 +405,23 @@ mod tests {
         if std::env::var("VORAX_REPLAY_CASE").ok().as_deref()==Some(name.as_str()) {return true;}
         let output=std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact",name.as_str(),"--nocapture","--test-threads=1"])
-            .env("VORAX_LANGUAGE","ko").env("VORAX_REPLAY_CASE",&name).output().unwrap();
+            .env("VORAX_LANGUAGE","ko").env("VORAX_OCR_MODE","accurate").env("VORAX_REPLAY_CASE",&name).output().unwrap();
         assert!(output.status.success(),"Korean production replay failed:\n{}\n{}",String::from_utf8_lossy(&output.stdout),String::from_utf8_lossy(&output.stderr));
         false
     }
     fn round_ten_ocr(third:&'static str)->impl FnMut(&super::Img)->String {
-        let mut heading=0;
+        let (mut heading,mut middle)=(0,0);
         move |img:&super::Img| {
             if (img.width,img.height)==(464,120) {heading+=1;}
             if (img.width,img.height)==(464,120) {match heading {1=>"혼합 거머리 용액",2=>"생•간 가루와",_=>third}.to_string()}
-            else {"성글 가루약\n런던 1 몬스터\n기근\n1 그&".to_string()}
+            else {
+                middle+=1;
+                match middle {
+                    1=>"랜업1\n-터",
+                    2=>"성글 가루약\n런던 1 몬스터\n기근\n1 그&",
+                    _=>"'경골 가루약\n1 그륜 몬스터\n1 그&",
+                }.to_string()
+            }
         }
     }
     #[test]
