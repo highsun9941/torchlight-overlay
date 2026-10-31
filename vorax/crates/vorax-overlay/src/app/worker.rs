@@ -74,6 +74,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
     let mut watch = ScreenWatch::default();
     let mut last_visual_poll = Instant::now() - VISUAL_POLL;
     let mut last_heartbeat=Instant::now();
+    let mut last_hovered=None;
+    let mut last_hover_wait=Instant::now()-Duration::from_secs(3);
     let mut follower: Option<Follower> = None;
     let mut looked_for_log = Instant::now() - Duration::from_secs(60);
     let mut settler = Settler::default();
@@ -149,7 +151,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         if last_log_check.elapsed() >= Duration::from_secs(1) {
             last_log_check = Instant::now();
             if last_heartbeat.elapsed()>=Duration::from_secs(10) {
-                diagnostics::event(0,"watch_heartbeat",serde_json::json!({"capture":capturer.state(),"pendingSlots":pipe.requested_slots(),"lastChange":watch.last_difference,"retries":retries}));
+                diagnostics::event(0,"watch_heartbeat",serde_json::json!({"capture":capturer.state(),"pendingSlots":pipe.requested_slots(),"pointerSlot":last_hovered,"foreground":super::sys::foreground().0,"lastChange":watch.last_difference,"retries":retries}));
                 last_heartbeat=Instant::now();
             }
             game_open_since = if find_game_window().is_some() { game_open_since.or(Some(Instant::now())) } else { None };
@@ -184,38 +186,48 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         let size=pipe.pending().and_then(|r|r.hand_ranks.as_ref()).map_or(3,|h|h.len().max(3));
                         let hovered=super::sys::hovered_card(game,pipe.ui(),size);
                         watch.set_hover(hovered);
+                        last_hovered=hovered;
                         let mut inspecting=false;
-                        if let (Some(slot),Some(engine))=(hovered,ocr.as_ref()) {
-                            if pipe.requested_slots().contains(&slot) {
+                        let requested=pipe.requested_slots();
+                        let tip=if requested.is_empty() && !pipe.hover_dirty() {None} else {vorax_scan::hover::tooltip(&frame)};
+                        if !requested.is_empty() {
+                            if let (Some(_),Some(engine),Some(pending))=(tip.as_ref(),ocr.as_ref(),pipe.pending()) {
                                 inspecting=true;
-                                if let Some(pending)=pipe.pending() {
-                                    let phase=match pending.state.phase {vorax::advisor::ScreenPhase::Potion=>"potion",vorax::advisor::ScreenPhase::Instrument=>"instrument",_=>"protocol"};
-                                    let ranks=pending.hand_ranks.as_ref().and_then(|r|r.get(slot)).cloned().unwrap_or_default();
-                                    let hover_id=diagnostics::next_scan();
-                                    let mut hover_texts=Vec::new();let mut hover_crops=Vec::new();
-                                    let mut text=|crop:&vorax_scan::Img| {
-                                        let result=engine.read(crop);
-                                        let text=result.as_ref().ok().cloned().unwrap_or_default();
-                                        hover_texts.push(serde_json::json!({"size":[crop.width,crop.height],"text":text,"error":result.err().map(|e|e.to_string())}));
-                                        hover_crops.push(crop.clone());text
-                                    };
-                                    let result=vorax_scan::hover::recognize(&frame,phase,&ranks,&mut text);
-                                    drop(text);
-                                    diagnostics::event(hover_id,"hover_ocr",serde_json::json!({"slot":slot,"result":result,"sourceCandidates":ranks,"ocr":hover_texts}));
-                                    if result.is_err() {diagnostics::save(hover_id,"hover_unverified",&frame,None,pipe.pending(),&hover_texts,&hover_crops,serde_json::json!({"slot":slot,"result":result}));}
-                                    if let Ok(result)=result {
-                                        if pipe.confirm_hover(slot,&result,now_ms()) {
-                                            diagnostics::event(0,"hover_confirmed",serde_json::json!({"slot":slot,"name":result.name,"remaining":pipe.requested_slots()}));
-                                            status("확대 인식 완료","다음 파란 카드에 마우스를 올리거나, 카드 밖으로 옮겨 추천을 갱신하세요.","확대 결과 유지 중");
-                                            if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
-                                        }
-                                        else {status("확대 스캔 확인 중",&format!("{}번 카드에 마우스를 잠시 유지하세요.",slot+1),"같은 이름 두 번 확인");}
-                                    } else {status("확대 스캔 대기",&format!("파란 테두리의 {}번 카드에 마우스를 올려 확대 카드를 보여 주세요.",slot+1),"추천 보류");}
+                                let phase=match pending.state.phase {vorax::advisor::ScreenPhase::Potion=>"potion",vorax::advisor::ScreenPhase::Instrument=>"instrument",_=>"protocol"};
+                                let candidates:Vec<_>=requested.iter().map(|&slot|(slot,pending.hand_ranks.as_ref().and_then(|r|r.get(slot)).cloned().unwrap_or_default())).collect();
+                                let hover_id=diagnostics::next_scan();
+                                let mut hover_texts=Vec::new();let mut hover_crops=Vec::new();
+                                let mut text=|crop:&vorax_scan::Img| {
+                                    let result=engine.read(crop);
+                                    let text=result.as_ref().ok().cloned().unwrap_or_default();
+                                    hover_texts.push(serde_json::json!({"size":[crop.width,crop.height],"text":text,"error":result.err().map(|e|e.to_string())}));
+                                    hover_crops.push(crop.clone());text
+                                };
+                                let result=vorax_scan::hover::recognize(&frame,phase,&[],&mut text);
+                                drop(text);
+                                let slot=result.as_ref().ok().and_then(|r|vorax_scan::hover::target(&r.name,&candidates,hovered));
+                                diagnostics::event(hover_id,"hover_ocr",serde_json::json!({"slot":slot,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0,"result":result,"sourceCandidates":candidates,"ocr":hover_texts}));
+                                if result.is_err() || slot.is_none() {diagnostics::save(hover_id,"hover_unverified",&frame,None,pipe.pending(),&hover_texts,&hover_crops,serde_json::json!({"slot":slot,"result":result}));}
+                                if let (Ok(result),Some(slot))=(result,slot) {
+                                    if pipe.confirm_hover(slot,&result,now_ms()) {
+                                        diagnostics::event(hover_id,"hover_confirmed",serde_json::json!({"slot":slot,"name":result.name,"remaining":pipe.requested_slots()}));
+                                        status("확대 인식 완료","다음 파란 카드에 마우스를 올리거나, 카드 밖으로 옮겨 추천을 갱신하세요.","확대 결과 유지 중");
+                                        if let Some(plan)=pipe.hover_plan() {send(ToUi::Show(plan,frame.width,frame.height));} else {send(ToUi::Clear);}
+                                    } else {status("확대 스캔 확인 중",&format!("{}번 확대 카드 내용을 한 번 더 확인합니다.",slot+1),"같은 이름 두 번 확인");}
+                                } else {
+                                    pipe.cancel_hover_candidate();
+                                    status("확대 스캔 대기","파란 카드의 확대 내용을 보여 주세요. 후보가 겹치면 원래 카드에 마우스를 유지하세요.","제목·그림·카드 위치 확인 중");
+                                }
+                            } else {
+                                pipe.cancel_hover_candidate();
+                                if last_hover_wait.elapsed()>=Duration::from_secs(3) {
+                                    diagnostics::event(0,"hover_wait",serde_json::json!({"reason":if tip.is_none(){"tooltip_missing"}else{"ocr_unavailable"},"requested":requested,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0}));
+                                    last_hover_wait=Instant::now();
                                 }
                             }
                         } else {pipe.cancel_hover_candidate();}
                         if pipe.hover_dirty() {
-                            if hovered.is_some() && vorax_scan::hover::tooltip(&frame).is_some() {inspecting=true;}
+                            if hovered.is_some() && tip.is_some() {inspecting=true;}
                             else {visual=true;}
                         }
                         if inspecting && !visual {continue;}

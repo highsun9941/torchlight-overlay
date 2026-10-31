@@ -74,3 +74,28 @@ pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn F
     }
     Err(HoverFailure{stage:"title_or_art_not_verified".into(),texts,art:art.into_iter().take(5).collect()})
 }
+
+/// A visible enlarged card may be read while the helper has focus or the pointer has already moved.
+/// Use its name/art to find a unique unresolved slot. Pointer geometry only breaks a real ambiguity.
+pub fn target(name:&str,candidates:&[(usize,Vec<(String,f64)>)],pointer:Option<usize>)->Option<usize> {
+    let matching:Vec<_>=candidates.iter().filter(|(_,r)|r.is_empty() || r.iter().all(|(_,s)|*s<0.90)
+        || r.iter().any(|(n,s)|n==name&&*s>=0.90)).map(|(i,_)|*i).collect();
+    if matching.len()==1 {matching.first().copied()}
+    else {pointer.filter(|i|matching.contains(i))}
+}
+
+#[cfg(test)]
+mod target_tests {
+    use super::target;
+    #[test]
+    fn visible_tooltip_does_not_require_foreground_or_pointer_but_ambiguous_slots_do() {
+        let a=vec![(0,vec![("foot".into(),0.99)]),(1,vec![("brain".into(),0.99)])];
+        assert_eq!(target("foot",&a,None),Some(0));
+        assert_eq!(target("foot",&a,Some(1)),Some(0));
+        assert_eq!(target("claw",&a,None),None);
+        let b=vec![(0,vec![("potion".into(),0.99)]),(1,vec![("potion".into(),0.99)])];
+        assert_eq!(target("potion",&b,None),None);
+        assert_eq!(target("potion",&b,Some(1)),Some(1));
+        assert_eq!(target("foot",&[(2,vec![])],None),Some(2));
+    }
+}

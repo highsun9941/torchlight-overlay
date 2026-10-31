@@ -1,19 +1,23 @@
 //! Compare named UI regions by shape, with hover motion and the left-hand tooltip excluded.
 use crate::layout::{card_face, layout_at};
-use crate::pixels::{Img, Rect};
+use crate::pixels::{gray, Img, Rect};
 
 #[derive(Clone)]
 struct Area { name: String, values: Vec<f32>, ignored: bool }
 #[derive(Clone)]
-struct Stamp { size: (usize, usize), ui: f64, present: usize, areas: Vec<Area> }
+struct Stamp { size: (usize, usize), ui: f64, present: usize, areas: Vec<Area>, tanks:Vec<Option<String>> }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub struct Difference { pub area: String, pub similarity: f64, pub mean_delta: f64 }
+pub struct Difference {
+    pub area:String,pub similarity:f64,pub mean_delta:f64,
+    #[serde(skip_serializing_if="Option::is_none")] pub before:Option<String>,
+    #[serde(skip_serializing_if="Option::is_none")] pub after:Option<String>,
+}
 
 impl Stamp {
     fn new(img: &Img, ui: f64, hovered: Option<usize>) -> Self {
         let l = layout_at(img.width, img.height, ui);
-        let tooltip=hovered.and_then(|_|crate::hover::tooltip(img)).map(|t|t.rect);
+        let tooltip=crate::hover::tooltip(img).map(|t|t.rect);
         let mut areas = Vec::new();
         let mut add = |name: String, r: Rect, text: bool, ignored: bool| {
             let covered=tooltip.is_some_and(|t|r.x<t.x+t.w && r.x+r.w>t.x && r.y<t.y+t.h && r.y+r.h>t.y);
@@ -27,27 +31,34 @@ impl Stamp {
             add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, hovered == Some(i));
             add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, hovered == Some(i));
         }
-        for i in 0..6 {
-            add(format!("tank{i}.total"), l.total_band[i], true, false);
-            add(format!("tank{i}.quantity"), l.aq_band[i], true, false);
-            add(format!("tank{i}.name"), l.name_band[i], true, false);
-            add(format!("tank{i}.icon"), l.icon[i], true, false);
-        }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
         let count=crate::cards::cards_present(img,&l);
-        let present=if count<3 && hovered.is_some() && tooltip.is_some() {3} else {count};
-        Self { size:(img.width,img.height),ui,present,areas }
+        let present=if count<3 && tooltip.is_some() {3} else {count};
+        let g=gray(img);
+        let tanks=(0..6).map(|i| {
+            let r=crate::adaptive::tank(img,&g,&l,i,crate::scan_data());
+            r.monster.filter(|_|r.fields.get(&format!("tank{i}.activity")).is_some_and(|f|f.sure)
+                && r.fields.get(&format!("tank{i}.quantity")).is_some_and(|f|f.sure))
+                .and_then(|m|serde_json::to_string(&m).ok())
+        }).collect();
+        Self { size:(img.width,img.height),ui,present,areas,tanks }
     }
     fn differences(&self, other: &Self) -> Vec<Difference> {
         if self.size != other.size || self.ui != other.ui || self.areas.len()!=other.areas.len() {
-            return vec![Difference { area:"capture.size_or_layout".into(),similarity:0.0,mean_delta:255.0 }];
+            return vec![Difference { area:"capture.size_or_layout".into(),similarity:0.0,mean_delta:255.0,before:None,after:None }];
         }
-        if self.present!=other.present {return vec![Difference{area:"hand.animation".into(),similarity:0.0,mean_delta:255.0}];}
-        self.areas.iter().zip(&other.areas).filter(|(_,b)| !b.ignored).filter_map(|(a,b)| {
+        if self.present!=other.present {return vec![Difference{area:"hand.animation".into(),similarity:0.0,mean_delta:255.0,before:None,after:None}];}
+        let mut diffs:Vec<Difference>=self.areas.iter().zip(&other.areas).filter(|(_,b)| !b.ignored).filter_map(|(a,b)| {
             let delta=a.values.iter().zip(&b.values).map(|(x,y)|(x-y).abs() as f64).sum::<f64>()/a.values.len() as f64;
             let similarity=correlation(&a.values,&b.values);
-            (similarity < 0.90 && delta > if b.name.starts_with("tank") || b.name=="round" || b.name=="refreshes" {0.8} else {3.0}).then(|| Difference {area:b.name.clone(),similarity,mean_delta:delta})
-        }).collect()
+            (similarity < 0.90 && delta > if b.name.starts_with("tank") || b.name=="round" || b.name=="refreshes" {0.8} else {3.0}).then(|| Difference {area:b.name.clone(),similarity,mean_delta:delta,before:None,after:None})
+        }).collect();
+        for (i,(before,after)) in self.tanks.iter().zip(&other.tanks).enumerate() {
+            // Missing text is not proof that a monster vanished. Card/round changes still invalidate
+            // the screen; only a newly verified or changed numeric state can veto advice by itself.
+            if after.is_some() && before!=after {diffs.push(Difference{area:format!("tank{i}.verified_state"),similarity:0.0,mean_delta:0.0,before:before.clone(),after:after.clone()});}
+        }
+        diffs
     }
 }
 
@@ -95,7 +106,7 @@ impl ScreenWatch {
             if !diff.is_empty() { *before=stamp; *since=now_ms; self.last_difference=diff; }
             return if now_ms-*since>=350.0 {Change::Ready} else {Change::Waiting};
         }
-        let diff=self.accepted.as_ref().map_or_else(||vec![Difference {area:"first-frame".into(),similarity:0.0,mean_delta:255.0}],|s|s.differences(&stamp));
+        let diff=self.accepted.as_ref().map_or_else(||vec![Difference {area:"first-frame".into(),similarity:0.0,mean_delta:255.0,before:None,after:None}],|s|s.differences(&stamp));
         if diff.is_empty() {Change::Unchanged} else {self.last_difference=diff;self.pending=Some((stamp,now_ms));Change::Changed}
     }
     pub fn accept(&mut self,img:&Img,ui:f64) {
@@ -106,7 +117,7 @@ impl ScreenWatch {
         self.accepted=Some(stamp); self.pending=None;
     }
     pub fn compare(&self,img:&Img,ui:f64)->Vec<Difference> {
-        self.accepted.as_ref().map_or_else(||vec![Difference {area:"no-reference".into(),similarity:0.0,mean_delta:255.0}],|s|s.differences(&Stamp::new(img,ui,self.hovered)))
+        self.accepted.as_ref().map_or_else(||vec![Difference {area:"no-reference".into(),similarity:0.0,mean_delta:255.0,before:None,after:None}],|s|s.differences(&Stamp::new(img,ui,self.hovered)))
     }
     pub fn differs(&self,img:&Img,ui:f64)->bool { !self.compare(img,ui).is_empty() }
     pub fn reset(&mut self)->bool {let had=self.accepted.is_some()||self.pending.is_some();*self=Self::default();had}
@@ -148,7 +159,7 @@ mod tests {
     fn digits_rerolls_and_panel_changes_are_watched_but_scene_animation_is_not() {
         let a = Img::new(960, 540);
         let l = layout_at(960, 540, 1.0);
-        for area in [l.round, l.refresh, l.total_band[1], l.aq_band[2], l.name_band[0], l.icon[1], l.instrument_icon[0]] {
+        for area in [l.round, l.refresh, l.instrument_icon[0]] {
             let mut b = a.clone();
             fill(&mut b, area, 100);
             let mut watch = ScreenWatch::default();

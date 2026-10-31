@@ -22,3 +22,5 @@ Additional modifications in 1.1.0: bounded numeric-region recovery with product 
 Additional modifications in 1.1.1: log-independent visual change detection, stale-advice invalidation, isolated Korean title OCR and validated round-counter OCR fallback, and supplemental samples from a reported round-6 frame. No runtime dependency added.
 
 Additional modifications in 1.2.0: user-assisted enlarged-card OCR, blue unresolved-slot markers, persistent capture sessions, shape-based UI change detection, and bounded local diagnostic captures. No runtime package dependency added.
+
+Additional modifications in 1.2.1: verified tank-state change detection, glyph-row name colours, unique tooltip-to-slot routing without a foreground prerequisite, and regression inputs from user diagnostics. No new runtime dependency.

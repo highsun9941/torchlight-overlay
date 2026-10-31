@@ -5,7 +5,7 @@ use crate::data::ScanData;
 use crate::layout::Layout;
 use crate::pixels::{hsv, Img, Rect};
 use crate::reading::{FieldRead, Fields, TankDebug};
-use crate::text::{brightest, read_text, TextKind};
+use crate::text::{brightest, glyphs, read_text, TextKind};
 use vorax::advisor::ScreenMonster;
 use vorax::types::{Archetype, Rarity};
 
@@ -207,10 +207,26 @@ fn num(x: f64) -> String {
     format!("{}", x as i64)
 }
 
+/// The broad name band can include the red heart from the next row. Its brightest pixels then
+/// resemble empty red glass, even while the blue name and a valid numeric pair are visible.
+fn name_colour(img: &Img, band: &Rect) -> [f64; 3] {
+    let original=brightest(img,band);
+    if !empty_glow(original) && rarity_of(original).0==Rarity::Boss { return original; }
+    let boxes=glyphs(img,band,TextKind::Label);
+    if boxes.len()<2 {return original;}
+    let x=boxes.iter().map(|b|b.x).fold(f64::INFINITY,f64::min);
+    let y=boxes.iter().map(|b|b.y).fold(f64::INFINITY,f64::min);
+    let right=boxes.iter().map(|b|b.x+b.w).fold(f64::NEG_INFINITY,f64::max);
+    let bottom=boxes.iter().map(|b|b.y+b.h).fold(f64::NEG_INFINITY,f64::max);
+    if bottom-y<band.h*0.4 {return original;}
+    let ink=brightest(img,&Rect::new(x,y,right-x,bottom-y));
+    if !empty_glow(ink) && ink.iter().copied().fold(0.0f64,f64::max)>=NAME_MIN {ink} else {original}
+}
+
 /// `glow`: an empty tank's red glow taken for empty (not in upstream).
 pub fn read_tank(img: &Img, g: &[f32], l: &Layout, i: usize, data: &ScanData, glow: bool) -> TankRead {
     let mut fields = Fields::new();
-    let rgb = brightest(img, &l.name_band[i]);
+    let rgb = if glow {name_colour(img,&l.name_band[i])} else {brightest(img,&l.name_band[i])};
     // Math.max(...rgb) < NAME_MIN, where a NaN (a band off the picture) makes it false
     let max = if rgb.iter().any(|v| v.is_nan()) { f64::NAN } else { rgb[0].max(rgb[1]).max(rgb[2]) };
     if max < NAME_MIN || (glow && empty_glow(rgb)) {
