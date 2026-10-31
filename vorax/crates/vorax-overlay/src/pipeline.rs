@@ -398,6 +398,17 @@ mod tests {
     fn round_ten(file:&str)->super::Img {
         super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round10").join(file)).unwrap()
     }
+    /// main() selects Korean before the reader runs. A child test process reproduces that setup
+    /// without racing other parallel tests by mutating their shared language environment.
+    fn production_korean_case(name:&str)->bool {
+        let name=format!("pipeline::tests::{name}");
+        if std::env::var("VORAX_REPLAY_CASE").ok().as_deref()==Some(name.as_str()) {return true;}
+        let output=std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact",name.as_str(),"--nocapture","--test-threads=1"])
+            .env("VORAX_LANGUAGE","ko").env("VORAX_REPLAY_CASE",&name).output().unwrap();
+        assert!(output.status.success(),"Korean production replay failed:\n{}\n{}",String::from_utf8_lossy(&output.stdout),String::from_utf8_lossy(&output.stderr));
+        false
+    }
     fn round_ten_ocr(third:&'static str)->impl FnMut(&super::Img)->String {
         let mut heading=0;
         move |img:&super::Img| {
@@ -428,6 +439,7 @@ mod tests {
     #[test]
     fn the_reported_round_ten_offer_reaches_advice_without_a_counter_loop() {
         use super::*;
+        if !production_korean_case("the_reported_round_ten_offer_reaches_advice_without_a_counter_loop") {return;}
         let frame=round_ten("rest.png");let mut pipe=Pipeline::new(0);let mut text=round_ten_ocr("강력 이종 제거 가루와");
         match pipe.run(&frame,None,Some(&mut text)) {
             Outcome::Advice{reading,..}=>{
@@ -444,6 +456,7 @@ mod tests {
     #[test]
     fn a_damaged_leading_modifier_requests_the_third_card_instead_of_the_base_powder() {
         use super::*;
+        if !production_korean_case("a_damaged_leading_modifier_requests_the_third_card_instead_of_the_base_powder") {return;}
         let mut pipe=Pipeline::new(0);let mut text=round_ten_ocr(",罔 이종 제거 가루와");
         let result=pipe.run(&round_ten("rest.png"),None,Some(&mut text));
         let Outcome::Uncertain{reading}=result else {panic!("a lost modifier must request enlargement")};
