@@ -130,6 +130,19 @@ impl Pipeline {
             fields.iter().filter_map(|f|f.strip_prefix("hand").and_then(|n|n.parse().ok())).take(1).collect()
         })
     }
+    /// The guide is sequential, but association must consider every offered slot. Otherwise a
+    /// similar vial in another unresolved slot could be assigned to the sole requested slot.
+    pub fn hover_candidates(&self) -> Vec<(usize,Vec<(String,f64)>)> {
+        self.pending.as_ref().map_or_else(Vec::new,|r| {
+            let size=r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3),|h|h.len().max(3));
+            (0..size).map(|i| {
+                let ranks=if let Some(name)=r.fields.get(&format!("hand{i}")).filter(|f|f.sure).and_then(|f|f.guess.as_ref()) {
+                    vec![(name.clone(),1.0)]
+                } else {r.hand_ranks.as_ref().and_then(|h|h.get(i)).cloned().unwrap_or_default()};
+                (i,ranks)
+            }).collect()
+        })
+    }
     pub fn hover_plan(&self) -> Option<Plan> {
         let r=self.pending.as_ref()?;
         let frame=r.frame.as_ref()?;
@@ -407,6 +420,23 @@ mod tests {
         }
         assert_eq!(pipe.memory.names().len(),3);
         assert_eq!(pipe.pending().unwrap().state.round,Some(8));
+    }
+
+    #[test]
+    fn a_sequential_guide_still_checks_other_similar_vials_before_association() {
+        use super::*;
+        let value:serde_json::Value=serde_json::from_str(include_str!("../../../fixtures/round-memory/reading-0.json")).unwrap();
+        let mut r:Reading=serde_json::from_value(value["reading"].clone()).unwrap();
+        r.fields.get_mut("round").unwrap().sure=true;r.state.round=Some(8);
+        r.problems.retain(|p|!matches!(p,Problem::Unreadable{field} if field=="round"));
+        let twin=r.hand_ranks.as_ref().unwrap()[1].clone();r.hand_ranks.as_mut().unwrap()[2]=twin;
+        r.fields.get_mut("hand2").unwrap().sure=false;
+        let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut r);assert_eq!(pipe.requested_slots(),[1]);
+        let candidates=pipe.hover_candidates();
+        assert_eq!(vorax_scan::hover::target("Twin Hormone - Pest",&candidates,None),None);
+        assert_eq!(vorax_scan::hover::target("Twin Hormone - Pest",&candidates,Some(2)),Some(2));
+        assert_eq!(vorax_scan::hover::target("Twin Hormone - Pest",&candidates,Some(1)),Some(1));
+        assert_eq!(vorax_scan::hover::target("Mutagenic Powder",&candidates,None),Some(0),"an already confirmed popup cannot fill the next requested slot");
     }
 
     #[test]

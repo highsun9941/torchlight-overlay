@@ -196,7 +196,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                             if let (Some(_),Some(engine),Some(pending))=(tip.as_ref(),ocr.as_ref(),pipe.pending()) {
                                 inspecting=true;
                                 let phase=match pending.state.phase {vorax::advisor::ScreenPhase::Potion=>"potion",vorax::advisor::ScreenPhase::Instrument=>"instrument",_=>"protocol"};
-                                let candidates:Vec<_>=requested.iter().map(|&slot|(slot,pending.hand_ranks.as_ref().and_then(|r|r.get(slot)).cloned().unwrap_or_default())).collect();
+                                let candidates=pipe.hover_candidates();
                                 let hover_id=diagnostics::next_scan();
                                 let mut hover_texts=Vec::new();let mut hover_crops=Vec::new();
                                 let mut text=|crop:&vorax_scan::Img| {
@@ -207,7 +207,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                                 };
                                 let result=vorax_scan::hover::recognize(&frame,phase,&[],&mut text);
                                 drop(text);
-                                let slot=result.as_ref().ok().and_then(|r|vorax_scan::hover::target(&r.name,&candidates,hovered));
+                                let slot=result.as_ref().ok().and_then(|r|vorax_scan::hover::target(&r.name,&candidates,hovered)).filter(|slot|requested.contains(slot));
                                 diagnostics::event(hover_id,"hover_ocr",serde_json::json!({"slot":slot,"pointerSlot":hovered,"foreground":super::sys::foreground().0,"gameWindow":game.0,"result":result,"sourceCandidates":candidates,"ocr":hover_texts}));
                                 if result.is_err() || slot.is_none() {diagnostics::save(hover_id,"hover_unverified",&frame,None,pipe.pending(),&hover_texts,&hover_crops,serde_json::json!({"slot":slot,"result":result}));}
                                 if let (Ok(result),Some(slot))=(result,slot) {
