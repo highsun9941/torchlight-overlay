@@ -558,7 +558,7 @@ mod tests {
         let mut pipe=Pipeline::new(0);pipe.apply_zoom(&mut r);
         assert_eq!(pipe.requested_slots(),[0]);
         let plan=pipe.hover_plan().unwrap();assert_eq!(plan.inspect.len(),1);assert!(plan.card.is_none());
-        let read=vorax_scan::hover::HoverRead{name:"Digestive Enzyme Solution".into(),text:"소화 효소 용액".into(),title_score:12.0,art_score:0.99,tooltip:vorax_scan::hover::Tooltip{rect:Default::default(),center:vorax_scan::hover::CardPosData{x:0.0,y:0.0},scale:1.0}};
+        let read=vorax_scan::hover::HoverRead{name:"Digestive Enzyme Solution".into(),text:"소화 효소 용액".into(),title_score:12.0,art_score:0.99,tooltip:vorax_scan::hover::Tooltip{rect:Default::default(),center:vorax_scan::hover::CardPosData{x:0.0,y:0.0},scale:1.0},title_area:Default::default(),match_kind:"complete_title".into()};
         assert!(!pipe.confirm_hover(1,&read,0.0));
         assert!(!pipe.confirm_hover(0,&read,500.0));
         assert!(pipe.confirm_hover(0,&read,1000.0));
@@ -674,10 +674,118 @@ mod tests {
             let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text);
             assert!(matches!(&read,Ok(r) if r.name=="Gray Matter Spinal Solution"),"blue potion {i}: {read:?}");
         }
+        let frame=title_motion("tooltip.png");let mut text=|img:&Img|ocr.read(img).unwrap();
+        let read=vorax_scan::hover::recognize(&frame,"potion",&[],&mut text);
+        assert!(matches!(&read,Ok(r) if r.name=="Green Bile Solution"),"green enlarged title: {read:?}");
+        for file in ["hover.png","rest.png"] {
+            let frame=title_motion(file);let l=layout_at(frame.width,frame.height,1.0);
+            let text=ocr.read(&vorax_scan::titles::heading_crop(&frame,&l.cards[1],l.k)).unwrap();
+            assert!(vorax_scan::titles::name_fit("Green Bile Solution",&text)>=6.0,"actual moving-title OCR {file}: {text}");
+        }
     }
 
     fn blue_potion(i:usize)->super::Img {
         super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../fixtures/blue-tooltip/potion-{i}.png"))).unwrap()
+    }
+
+    fn title_motion(file:&str)->super::Img {
+        let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/title-motion").join(file)).unwrap();
+        super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
+    }
+
+    #[test]
+    fn moving_title_rows_keep_dense_hangul_and_follow_each_card_independently() {
+        use super::*;
+        let mut areas=Vec::new();let mut centers=Vec::new();
+        for file in ["hover.png","rest.png"] {
+            let frame=title_motion(file);let l=layout_at(frame.width,frame.height,1.0);let mut row=Vec::new();
+            for (slot,c) in l.cards.iter().enumerate() {
+                let (img,area)=vorax_scan::titles::located_heading(&frame,c,l.k,false);
+                assert_eq!((img.width,img.height),(464,120));
+                assert!(area.h>3.0 && area.h<45.0,"{file} slot {slot}: {area:?}");
+                if slot==1 {
+                    assert!((690.0..715.0).contains(&area.y),"the raised card's heading, not its description: {area:?}");
+                    let ink=(20..100).flat_map(|y|(175..290).map(move|x|(x,y))).filter(|&(x,y)|img.px(x,y).0<100).count();
+                    assert!(ink>400,"dense middle syllables must survive background removal: {ink}");
+                    centers.push(vorax_scan::pixels::signature(&img,vorax_scan::pixels::Rect::new(0.0,0.0,464.0,120.0),64,16));
+                }
+                if std::env::var_os("VORAX_QA_CROPS").is_some() {
+                    let path=std::env::temp_dir().join(format!("title-{file}-{slot}.png"));
+                    encode_png(&path,img.width as u32,img.height as u32,&img.data).unwrap();
+                    let bytes=std::fs::read(path).unwrap();let hex=bytes.iter().map(|b|format!("{b:02x}")).collect::<String>();
+                    println!("QA_TITLE {file}-{slot} {hex}");
+                }
+                row.push(area);
+            }
+            areas.push(row);
+        }
+        assert!((areas[0][0].x-areas[1][0].x).abs()>10.0,"the left neighbour slides separately");
+        assert!((areas[0][2].x-areas[1][2].x).abs()>10.0,"the right neighbour slides separately");
+        assert!(vorax_scan::pixels::dot(&centers[0],&centers[1])>0.90,"different fan positions must normalize to the same middle title");
+        let frame=title_motion("tooltip.png");let tip=vorax_scan::hover::tooltip(&frame).unwrap();
+        let c=vorax_scan::layout::CardPos{cx:tip.center.x,cy:tip.center.y,angle:0.0};
+        let (img,area)=vorax_scan::titles::located_heading(&frame,&c,tip.scale,true);
+        assert!((545.0..565.0).contains(&area.y) && area.h<30.0,"enlarged heading only: {area:?}");
+        if std::env::var_os("VORAX_QA_CROPS").is_some() {
+            let path=std::env::temp_dir().join("title-enlarged.png");encode_png(&path,img.width as u32,img.height as u32,&img.data).unwrap();
+            let hex=std::fs::read(path).unwrap().iter().map(|b|format!("{b:02x}")).collect::<String>();println!("QA_TITLE enlarged {hex}");
+        }
+    }
+
+    #[test]
+    fn actual_failed_green_title_text_is_recovered_without_guessing_from_the_vial() {
+        use super::*;
+        let frame=title_motion("tooltip.png");
+        let cases:Vec<Vec<String>>=serde_json::from_str(include_str!("../../../fixtures/title-motion/recorded-recovery.json")).unwrap();
+        for texts in cases {
+            let mut iter=texts.iter();let mut ocr=|_:&Img|iter.next().cloned().unwrap_or_default();
+            let read=vorax_scan::hover::recognize(&frame,"potion",&[("Green Bile Solution".into(),0.98)],&mut ocr).unwrap();
+            assert_eq!(read.name,"Green Bile Solution");assert_eq!(read.match_kind,"unique_fragments");
+            assert!(read.art_score>=0.92);assert!(read.title_score<6.0,"replay the actual damaged title rather than substitute a perfect one");
+        }
+        let mut generic=|_:&Img|"1~2 그룹 몬스터를 선택해 랜덤 매직 몬스터로 변이시키고".to_string();
+        assert!(vorax_scan::hover::recognize(&frame,"potion",&[],&mut generic).is_err());
+        let mut damaged=|_:&Img|"푸른 {』'言 용액".to_string();
+        assert!(vorax_scan::hover::recognize(&frame,"potion",&[("Osteogenic Powder".into(),0.99)],&mut damaged).is_err());
+    }
+
+    #[test]
+    fn green_middle_slot_finishes_after_motion_and_a_noisy_read() {
+        use super::*;
+        use vorax_scan::watch::{Change,ScreenWatch};
+        fn ordinary()->impl FnMut(&Img)->String {
+            let mut heading=0;
+            move |img:&Img| {
+                if (img.width,img.height)==(464,120) {heading+=1;}
+                match heading {1=>"마이크로멜리아 가루약-해골 경비병",2=>"선택해 랜덤 매직",_=>"생골 가루약"}.to_string()
+            }
+        }
+        let first=title_motion("offer.png");let popup=title_motion("hover.png");let rest=title_motion("rest.png");
+        let mut pipe=Pipeline::new(0);let mut text=ordinary();
+        let result=pipe.run(&first,None,Some(&mut text));
+        assert!(matches!(result,Outcome::Uncertain{..}));assert_eq!(pipe.requested_slots(),[1]);
+        let mut watch=ScreenWatch::default();watch.accept(&first,1.0);watch.set_hover(Some(1));
+        assert_eq!(watch.observe(&popup,1.0,500.0),Change::Unchanged);
+        let capture=title_motion("tooltip.png");let texts:Vec<String>=serde_json::from_str(include_str!("../../../fixtures/title-motion/ocr.json")).unwrap();
+        let mut iter=texts.into_iter();let mut text=|_:&Img|iter.next().unwrap_or_default();
+        let read=vorax_scan::hover::recognize(&capture,"potion",&[],&mut text).unwrap();
+        let ranks=pipe.pending().unwrap().hand_ranks.as_ref().unwrap()[1].clone();
+        assert_eq!(vorax_scan::hover::target(&read.name,&[(1,ranks)],None),Some(1));
+        assert!(!pipe.confirm_hover(1,&read,500.0));
+        let mut noisy=|_:&Img|String::new();assert!(vorax_scan::hover::recognize(&capture,"potion",&[],&mut noisy).is_err());
+        assert!(pipe.confirm_hover(1,&read,1500.0),"a noisy intermediate OCR frame is not contradictory evidence");
+        watch.set_hover(None);assert_eq!(watch.observe(&rest,1.0,2000.0),Change::Unchanged);
+        assert_eq!(watch.observe(&rest,1.0,2500.0),Change::Unchanged);
+        assert!(pipe.requested_slots().is_empty());let mut text=ordinary();
+        match pipe.run(&rest,None,Some(&mut text)) {
+            Outcome::Advice{reading,..}=>{
+                assert_eq!(reading.state.hand,["Slender-Limb Powder - Bone Sentry","Green Bile Solution","Osteogenic Powder"]);
+                assert_eq!(reading.state.round,Some(5));let m=reading.state.tanks[0].as_ref().unwrap();
+                assert_eq!((m.activity,m.quantity),(396,333));
+            },
+            Outcome::Uncertain{reading}=>panic!("middle title must leave assistance: {}",serde_json::to_string(&reading).unwrap()),
+            _=>panic!("complete board expected"),
+        }
     }
 
     // These strings are the captured ordinary-offer OCR, in order. The enlarged card is a separate

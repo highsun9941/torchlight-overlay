@@ -117,32 +117,75 @@ pub fn inspect_tooltip(img:&Img)->TooltipSearch {
 pub fn tooltip(img:&Img)->Option<Tooltip> {inspect_tooltip(img).tooltip}
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub struct HoverRead {pub name:String,pub text:String,pub title_score:f64,pub art_score:f64,pub tooltip:Tooltip}
+pub struct HoverRead {pub name:String,pub text:String,pub title_score:f64,pub art_score:f64,pub tooltip:Tooltip,pub title_area:Rect,pub match_kind:String}
 
 #[derive(Clone,Debug,serde::Serialize)]
-pub struct HoverFailure {pub stage:String,pub texts:Vec<String>,pub art:Vec<(String,f64)>}
+pub struct HoverFailure {pub stage:String,pub texts:Vec<String>,pub art:Vec<(String,f64)>,pub tooltip:Option<Tooltip>,pub title_area:Option<Rect>,pub title_ranks:Vec<(String,f64)>,pub fragments:Vec<String>}
+
+/// A damaged middle may be recovered only with two exact Hangul syllables at each end, no more
+/// than two edits, and a unique name in the entire offer catalog. Generic description text and
+/// short fragments such as "용액" cannot qualify. Artwork and slot association remain mandatory.
+fn fragment_matches(local:&str,text:&str)->bool {
+    let name:Vec<char>=local.chars().filter(|c|crate::korean::hangul(*c)).collect();
+    if name.len()<5 {return false;}
+    for line in text.lines() {
+        let letters:Vec<char>=line.chars().filter(|c|crate::korean::hangul(*c)).collect();
+        for start in 0..letters.len().saturating_sub(1) {
+            if letters[start..start+2]!=name[..2] {continue;}
+            for end in start+4..=letters.len().min(start+name.len()+2) {
+                if letters[end-2..end]!=name[name.len()-2..] {continue;}
+                let segment=&letters[start..end];let mut row:Vec<usize>=(0..=segment.len()).collect();
+                for (i,ch) in name.iter().enumerate() {
+                    let mut next=vec![i+1;segment.len()+1];
+                    for j in 1..=segment.len() {next[j]=(row[j]+1).min(next[j-1]+1).min(row[j-1]+usize::from(ch!=&segment[j-1]));}
+                    row=next;
+                }
+                if row[segment.len()]<=2 {return true;}
+            }
+        }
+    }false
+}
+
+fn fragment_names<'a>(names:impl Iterator<Item=(&'a str,&'a str)>,text:&str)->Vec<&'a str> {
+    names.filter(|(_,local)|fragment_matches(local,text)).map(|(name,_)|name).collect()
+}
 
 pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn FnMut(&Img)->String)->Result<HoverRead,HoverFailure> {
-    let tip=tooltip(img).ok_or_else(||HoverFailure{stage:"tooltip_missing".into(),texts:vec![],art:vec![]})?;
+    let tip=tooltip(img).ok_or_else(||HoverFailure{stage:"tooltip_missing".into(),texts:vec![],art:vec![],tooltip:None,title_area:None,title_ranks:vec![],fragments:vec![]})?;
     let mut texts=Vec::new();
     let c=CardPos {cx:tip.center.x,cy:tip.center.y,angle:0.0};
     let data=crate::scan_data();
     let art=crate::cards::rank_card_art(img,&c,tip.scale,phase,data);
     let names=match phase {"instrument"=>&data.names.instrument,"protocol"=>&data.names.protocol,_=>&data.names.potion};
-    let mut attempts=vec![crate::titles::heading_crop(img,&c,tip.scale),crate::titles::title_crop(img,&c,tip.scale)];
+    let (heading,title_area)=crate::titles::located_heading(img,&c,tip.scale,true);
+    let mut attempts=vec![heading,crate::titles::title_crop(img,&c,tip.scale)];
+    let mut title_ranks=Vec::new();let mut fragments=Vec::new();
     for crop in attempts.drain(..) {
         let text=read(&crop);
         texts.push(text.clone());
         let mut ranks:Vec<_>=names.iter().map(|n|(n,crate::titles::name_fit(n,&text))).collect();
         ranks.sort_by(|a,b|b.1.total_cmp(&a.1));
         let Some((name,q))=ranks.first() else {continue;};
+        title_ranks=ranks.iter().take(3).map(|(n,q)|((*n).clone(),*q)).collect();
         let score=art.iter().find(|(n,_)|n==*name).map_or(0.0,|x|x.1);
         let supported=original.is_empty() || original.iter().all(|(_,s)|*s<0.90) || original.iter().any(|(n,s)|n==*name&&*s>=0.90);
         if *q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0 && score>=0.92 && supported {
-            return Ok(HoverRead {name:(*name).clone(),text,title_score:*q,art_score:score,tooltip:tip});
+            return Ok(HoverRead {name:(*name).clone(),text,title_score:*q,art_score:score,tooltip:tip,title_area,match_kind:"complete_title".into()});
+        }
+        if !(*q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0) {
+            let partial=fragment_names(names.iter().map(|n|(n.as_str(),crate::korean::name(n))),&text);
+            fragments=partial.iter().map(|s|s.to_string()).collect();
+            if let [name]=partial.as_slice() {
+                let name=*name;
+                let score=art.iter().find(|(n,_)|n.as_str()==name).map_or(0.0,|x|x.1);
+                let supported=original.is_empty() || original.iter().all(|(_,s)|*s<0.90) || original.iter().any(|(n,s)|n.as_str()==name&&*s>=0.90);
+                if score>=0.92 && supported {
+                    return Ok(HoverRead{name:name.to_string(),title_score:crate::titles::name_fit(name,&text),text,art_score:score,tooltip:tip,title_area,match_kind:"unique_fragments".into()});
+                }
+            }
         }
     }
-    Err(HoverFailure{stage:"title_or_art_not_verified".into(),texts,art:art.into_iter().take(5).collect()})
+    Err(HoverFailure{stage:"title_or_art_not_verified".into(),texts,art:art.into_iter().take(5).collect(),tooltip:Some(tip),title_area:Some(title_area),title_ranks,fragments})
 }
 
 /// A visible enlarged card may be read while the helper has focus or the pointer has already moved.
@@ -167,5 +210,16 @@ mod target_tests {
         assert_eq!(target("potion",&b,None),None);
         assert_eq!(target("potion",&b,Some(1)),Some(1));
         assert_eq!(target("foot",&[(2,vec![])],None),Some(2));
+    }
+    #[test]
+    fn damaged_hangul_requires_exact_ends_a_bounded_gap_and_catalog_uniqueness() {
+        use super::{fragment_matches,fragment_names};
+        assert!(fragment_matches("푸른 담즙 용액","푸른 {』'言 용액"));
+        assert!(fragment_matches("푸른 담즙 용액","푸른 {』'죠 용액"));
+        for bad in ["용액","담즙 용액","푸른 기타 다른 용액","1~2 그룹 몬스터를 선택해 랜덤 매직 몬스터로 변이시키고"] {
+            assert!(!fragment_matches("푸른 담즙 용액",bad),"{bad}");
+        }
+        let names=[("a","푸른 담즙 용액"),("b","푸른 농축 용액")];
+        assert_eq!(fragment_names(names.into_iter(),"푸른 용액").len(),2,"ambiguous fragments must never be treated as unique");
     }
 }
