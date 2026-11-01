@@ -57,8 +57,42 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
         _ => (false,Value::Null),
     };
     if !passed {failed.push("gold-saw/pipeline".into());}
+    // Replay the actual partial reading: its three card names and other five tanks were
+    // already confirmed. Only fresh model output from the original popup can fill tank 3.
+    let mut tank_pipe=crate::pipeline::Pipeline::new(0);
+    let mut partial:vorax_scan::reading::Reading=serde_json::from_slice(&std::fs::read(root.join("tank-tooltip/reading.json")).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    tank_pipe.apply_zoom(&mut partial);
+    let tank_before=tank_pipe.requested_tanks();
+    let popup=load(root,"tank-tooltip/popup.png")?;
+    let mut reader=|img:&Img| {
+        let name=format!("crop-{index:03}.png");index+=1;
+        let _=crate::pipeline::encode_png(&out.join(&name),img.width as u32,img.height as u32,&img.data);
+        let result=ocr.read(img);
+        attempts.push(json!({"file":"tank-tooltip/popup.png","crop":name,"width":img.width,"height":img.height,"text":result.as_ref().ok(),"error":result.as_ref().err().map(|e|e.to_string()),"model":ocr.details()}));
+        result.unwrap_or_default()
+    };
+    let tank_read=vorax_scan::tank_hover::recognize(&popup,&mut reader);
+    let tank_match=tank_read.as_ref().ok().and_then(|r|vorax_scan::tank_hover::target(r,&partial,None));
+    let mut confirmed=false;
+    if let (Ok(read),Some(slot))=(&tank_read,tank_match) {
+        if slot==2 && (read.activity,read.quantity,read.total)==(5,24,120) {
+            let first=tank_pipe.confirm_tank_hover(slot,read,500.0);
+            confirmed=!first && tank_pipe.confirm_tank_hover(slot,read,1000.0);
+        }
+    }
+    let mut subsequent_ocr=0;
+    let mut reader=|img:&Img| {subsequent_ocr+=1;ocr.read(img).unwrap_or_default()};
+    let tank_result=tank_pipe.run(&load(root,"tank-tooltip/rest.png")?,None,Some(&mut reader));
+    let (tank_advice,tank_reading)=match tank_result {
+        crate::pipeline::Outcome::Advice{reading,..}=>(reading.state.tanks[2].as_ref().is_some_and(|m|m.activity==5 && m.quantity==24) && reading.state.hand==partial.state.hand,serde_json::to_value(reading).unwrap()),
+        crate::pipeline::Outcome::Uncertain{reading}=>(false,serde_json::to_value(reading).unwrap()),
+        _=>(false,Value::Null),
+    };
+    let tank_ok=confirmed && tank_advice && tank_before==[2];
+    if !tank_ok {failed.push("tank-tooltip/pipeline".into());}
+    let tank_report=json!({"passed":tank_ok,"requestedBefore":tank_before,"result":tank_read,"matchedTank":tank_match,"confirmed":confirmed,"advice":tank_advice,"subsequentOcrCalls":subsequent_ocr,"reading":tank_reading});
     let report=json!({"backend":ocr.backend,"model":ocr.details(),"cases":cases,"attempts":attempts,
-        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"failures":failed});
+        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"failures":failed});
     std::fs::write(out.join("model-validation.json"),serde_json::to_vec_pretty(&report).unwrap()).map_err(|e|e.to_string())?;
     println!("PADDLE_VALIDATION {}",serde_json::to_string(&report).unwrap());
     if failed.is_empty() {Ok(())} else {Err(format!("PaddleOCR validation failed: {}",failed.join(", ")))}

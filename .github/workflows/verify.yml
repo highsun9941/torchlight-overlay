@@ -84,7 +84,7 @@ jobs:
         run: dotnet test tartarus/tests/Tartarus.Rules.Tests/Tartarus.Rules.Tests.csproj -c Release -p:Platform=x64 --logger trx
       - name: Build portable Windows helper
         run: ./build.ps1
-      - name: Read reported cards with the actual Korean CPU model
+      - name: Read reported cards and tank tooltip with the actual Korean CPU model
         id: ocr_validation
         env:
           VORAX_LANGUAGE: ko
@@ -149,14 +149,14 @@ jobs:
         run: python package.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TorchlightHelper-1.2.8-ocr.1-win-x64
+          name: TorchlightHelper-1.2.8-win-x64
           path: |
             release/*.zip
             release/*.sha256
           if-no-files-found: error
   release:
-    name: Publish verified OCR branch preview
-    if: github.event_name == 'pull_request' && github.head_ref == 'hf-korean-ocr-cpu' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Publish verified stable release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [rust, windows]
     runs-on: ubuntu-latest
     permissions:
@@ -165,12 +165,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: TorchlightHelper-1.2.8-ocr.1-win-x64
+          name: TorchlightHelper-1.2.8-win-x64
           path: release
       - name: Publish release after both test suites pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v1.2.8-ocr.1 >/dev/null 2>&1; then
-            gh release create v1.2.8-ocr.1 release/*.zip release/*.sha256 --target "${{ github.event.pull_request.head.sha }}" --prerelease --latest=false --title "Torchlight Helper 1.2.8-ocr.1 — 한국어 CPU OCR 실험판" --notes-file RELEASE_NOTES.md
+          if ! gh release view v1.2.8 >/dev/null 2>&1; then
+            gh release create v1.2.8 release/*.zip release/*.sha256 --target "${{ github.sha }}" --latest --title "Torchlight Helper 1.2.8 — 한국어 CPU OCR · 탱크 확대 인식" --notes-file RELEASE_NOTES.md
           fi

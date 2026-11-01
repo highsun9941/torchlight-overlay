@@ -2,7 +2,7 @@
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <!-- The app's version (shown in its window and sent with bug reports): bump it for every build given to testers. -->
-    <Version>1.2.8-ocr.1</Version>
+    <Version>1.2.8</Version>
     <Nullable>enable</Nullable>
     <PathMap>$(MSBuildThisFileDirectory)=/_/tartarus/</PathMap>
     <SentryDisableSourceGenerator>true</SentryDisableSourceGenerator>

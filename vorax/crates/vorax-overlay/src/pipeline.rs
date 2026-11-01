@@ -72,6 +72,7 @@ pub struct Pipeline {
     zoom_board: String,
     zoom_names: std::collections::BTreeMap<usize, String>,
     zoom_candidate: Option<(usize, String, f64)>,
+    tank_candidate: Option<(usize, String, vorax::types::Rarity, i64, i64, f64)>,
     zoom_dirty: bool,
     memory: crate::round_memory::RoundMemory,
     /// this game reached the Surgical Protocols (rounds 11-13): a board after them with no cards in hand is the game
@@ -101,19 +102,19 @@ pub fn shelley_rerolls(level: i32) -> i32 {
 
 impl Pipeline {
     pub fn new(shelley: i32) -> Pipeline {
-        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, zoom_dirty: false, memory: Default::default(), protocols: false, resumed: false }
+        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, tank_candidate: None, zoom_dirty: false, memory: Default::default(), protocols: false, resumed: false }
     }
 
-    pub fn ui(&self) -> f64 { self.last.as_ref().map_or(1.0, |(r, ..)| r.ui()) }
+    pub fn ui(&self) -> f64 { self.pending.as_ref().map(|r|r.ui()).unwrap_or_else(||self.last.as_ref().map_or(1.0, |(r, ..)| r.ui())) }
 
     /// Keep history for tracking rounds, but never re-display a plan after its screen changed.
     pub fn invalidate(&mut self) { self.last_current = false; }
 
     pub fn pending(&self) -> Option<&Reading> { self.pending.as_ref() }
     pub fn hover_dirty(&self) -> bool { self.zoom_dirty }
-    pub fn cancel_hover_candidate(&mut self) { self.zoom_candidate=None; }
+    pub fn cancel_hover_candidate(&mut self) { self.zoom_candidate=None; self.tank_candidate=None; }
     pub fn reset_hover(&mut self) {
-        self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.zoom_candidate=None; self.zoom_dirty=false;
+        self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.cancel_hover_candidate(); self.zoom_dirty=false;
         self.memory.clear();
     }
     pub fn memory_status(&self) -> serde_json::Value { serde_json::json!({"revision":self.memory.revision,"round":self.memory.round(),"confirmed":self.memory.confirmed(),"reused":self.memory.reused,"transitionCheck":self.memory.suspended}) }
@@ -129,6 +130,35 @@ impl Pipeline {
             if fields.iter().any(|f|f=="round" || f=="refreshes" || f.starts_with("tank")) {return Vec::new();}
             fields.iter().filter_map(|f|f.strip_prefix("hand").and_then(|n|n.parse().ok())).take(1).collect()
         })
+    }
+    /// Only missing numeric fields can be repaired from a monster tooltip. Its source tank's
+    /// category and the current round must already be verified.
+    pub fn requested_tanks(&self) -> Vec<usize> {
+        let Some(r)=&self.pending else {return Vec::new()};
+        if !r.fields.get("round").is_some_and(|f|f.sure) || self.memory.suspended {return Vec::new();}
+        let fields=r.blocking_fields();
+        (0..r.state.tanks.len()).filter(|i|r.state.tanks[*i].is_some()
+            && ["rarity","archetype"].iter().all(|p|r.fields.get(&format!("tank{i}.{p}")).is_some_and(|f|f.sure))
+            && ["activity","quantity"].iter().any(|p|fields.contains(&format!("tank{i}.{p}"))))
+            .take(1).collect()
+    }
+
+    pub fn confirm_tank_hover(&mut self, slot:usize, read:&vorax_scan::tank_hover::TankHoverRead, now:f64) -> bool {
+        if !self.requested_tanks().contains(&slot) || self.pending.as_ref().and_then(|r|vorax_scan::tank_hover::target(read,r,Some(slot)))!=Some(slot)
+            || read.activity.checked_mul(read.quantity)!=Some(read.total) || !(1..=1_000_000).contains(&read.activity) || !(1..=1_000_000).contains(&read.quantity) {return false;}
+        let same=self.tank_candidate.as_ref().is_some_and(|(i,n,r,a,q,t)|*i==slot && n==&read.name && r==&read.rarity && *a==read.activity && *q==read.quantity && (350.0..=2500.0).contains(&(now-*t)));
+        if !same {self.tank_candidate=Some((slot,read.name.clone(),read.rarity,read.activity,read.quantity,now));return false;}
+        self.tank_candidate=None;self.zoom_dirty=true;
+        if let Some(r)=&mut self.pending {
+            let m=r.state.tanks[slot].as_mut().unwrap();m.activity=read.activity;m.quantity=read.quantity;
+            for (part,value) in [("activity",read.activity),("quantity",read.quantity)] {
+                let field=format!("tank{slot}.{part}");
+                r.fields.insert(field.clone(),vorax_scan::reading::FieldRead {sure:true,guess:Some(value.to_string()),..Default::default()});
+                r.problems.retain(|p|!matches!(p,Problem::Unreadable{field:f} if f==&field));
+            }
+            self.memory.remember(r);
+        }
+        true
     }
     /// The guide is sequential, but association must consider every offered slot. Otherwise a
     /// similar vial in another unresolved slot could be assigned to the sole requested slot.
@@ -170,10 +200,10 @@ impl Pipeline {
             true
         } else {self.zoom_candidate=Some((slot,read.name.clone(),now));false}
     }
-    fn apply_zoom(&mut self, reading:&mut Reading) {
+    pub(crate) fn apply_zoom(&mut self, reading:&mut Reading) {
         self.memory.restore(reading);
         let key=self.memory.revision.to_string();
-        if key!=self.zoom_board {self.zoom_board=key;self.zoom_names.clear();self.zoom_candidate=None;self.zoom_dirty=false;}
+        if key!=self.zoom_board {self.zoom_board=key;self.zoom_names.clear();self.cancel_hover_candidate();self.zoom_dirty=false;}
         for (i,name) in &self.zoom_names {
             let field=format!("hand{i}");
             if !reading.fields.get(&field).is_some_and(|f|f.sure && f.guess.as_ref()==Some(name)) {
@@ -1281,3 +1311,7 @@ mod tests {
     }
 
 }
+
+#[cfg(test)]
+#[path = "tank_hover_tests.rs"]
+mod tank_hover_tests;

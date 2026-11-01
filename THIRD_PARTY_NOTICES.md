@@ -37,4 +37,4 @@ Additional modifications in 1.2.1: verified tank-state change detection, glyph-r
 
 1.2.7 fork modifications add four-edge gold tooltip fitting, blue-channel instrument headings, and catalog-unique short-title recovery supported by source and popup art. No runtime dependencies are added.
 
-1.2.8-ocr.1 connects Vorax to the already bundled Korean PP-OCRv5 mobile ONNX model from monkt/paddleocr-onnx (upstream PaddleOCR, Apache-2.0) through ONNX Runtime (MIT). Existing model hashes and notices remain applicable; no additional model weights are shipped.
+1.2.8 connects Vorax to the already bundled Korean PP-OCRv5 mobile ONNX model from monkt/paddleocr-onnx (upstream PaddleOCR, Apache-2.0) through ONNX Runtime (MIT). Existing model hashes and notices remain applicable; no additional model weights are shipped.

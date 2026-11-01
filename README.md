@@ -1,12 +1,12 @@
-# Torchlight Helper 1.2.8-ocr.1
+# Torchlight Helper 1.2.8
 
 토치라이트: 인피니트의 타르타로스와 블러드 러스트 수술 준비를 돕는 Windows 10/11 x64용 비공식 추천 오버레이입니다. 화면과 게임 로그를 읽으며, 카드 선택과 확인은 사용자가 직접 진행합니다.
 
-**[CPU OCR 실험판 ZIP 다운로드](https://github.com/highsun9941/torchlight-overlay/releases/tag/v1.2.8-ocr.1)** · [빌드·회귀 검사](https://github.com/highsun9941/torchlight-overlay/actions/workflows/verify.yml)
+**[실행용 ZIP 다운로드](https://github.com/highsun9941/torchlight-overlay/releases/tag/v1.2.8)** · [빌드·회귀 검사](https://github.com/highsun9941/torchlight-overlay/actions/workflows/verify.yml)
 
 ## 실행
 
-1. 릴리스의 `TorchlightHelper-KO-1.2.8-ocr.1-win-x64.zip` 전체를 새 폴더에 풉니다. `Source code` ZIP은 실행 파일이 아닙니다.
+1. 릴리스의 `TorchlightHelper-KO-1.2.8-win-x64.zip` 전체를 새 폴더에 풉니다. `Source code` ZIP은 실행 파일이 아닙니다.
 2. 기존 오버레이를 종료하고 `TorchlightHelper.exe`를 실행합니다. .NET과 타르타로스 한국어 OCR 모델을 포함합니다.
 3. 게임 언어를 맞추고 `콘텐츠 자동 감지`를 켭니다. 콘텐츠 자동 전환을 쓰려면 게임의 계정 관련 설정에서 로그를 활성화한 뒤 재접속합니다.
 4. 로그를 자동으로 찾지 못하면 `로그 선택`에서 `UE_game/Torchlight/Saved/Logs/UE_game.log`를 지정합니다.
@@ -20,7 +20,7 @@
 
 블러드 러스트 탭의 **CPU 사용 → 최대 성능**은 OS가 보고하는 모든 논리 CPU 스레드를 사용하고, 잘 읽히지 않는 카드 제목에 확대·대비 처리를 추가로 시도합니다. 코어 수는 자동으로 결정합니다. 기본 균형 모드는 기존 절반 코어·최대 8개 제한을 유지합니다.
 
-이 실험 브랜치의 한국어 카드 인식은 포함된 PaddleOCR 모바일 ONNX 모델을 CPU로 실행합니다. 모델을 한 번 로드하며 기본 1스레드로 잘라낸 글자 영역만 읽습니다. Python·GPU 설치나 외부 OCR 서버는 필요하지 않습니다. 엔진 종류와 모델 오류는 로그에 기록됩니다.
+한국어 카드·탱크 확대 인식은 포함된 PaddleOCR 모바일 ONNX 모델을 CPU로 실행합니다. 모델을 한 번 로드하며 기본 1스레드로 잘라낸 글자 영역만 읽습니다. Python·GPU 설치나 외부 OCR 서버는 필요하지 않습니다. 엔진 종류와 모델 오류는 로그에 기록됩니다.
 
 수치는 예상 위치 주변에서 다시 찾고, **활성 × 수량이 화면의 총합과 일치하는 경우**만 채택합니다. 세라일 미보유로 새로고침 기능이 없는 도구 선택은 0회로 처리합니다. 첫 라운드부터 추천 대상입니다.
 
@@ -85,4 +85,6 @@ python package.py
 
 금색 수술 도구의 확대 테두리와 제목 대비를 별도로 처리하며, 짧은 제목의 한 음절 손상은 원본/확대 그림과 전체 목록의 유일성을 검증한 경우에만 복구합니다.
 
-이 브랜치는 한국어 CPU OCR 실험판입니다. 블러드 러스트에서 포함된 PaddleOCR 한국어 모바일 모델을 사용하며 기본 CPU 1스레드로 실행합니다. 조사와 검증 방법은 OCR_RESEARCH.md에 있습니다.
+한국어 기본 OCR은 PaddleOCR입니다. 블러드 러스트에서 포함된 PaddleOCR 한국어 모바일 모델을 사용하며 기본 CPU 1스레드로 실행합니다. 조사와 검증 방법은 OCR_RESEARCH.md에 있습니다.
+
+탱크의 활성·수량만 미확인일 때는 해당 탱크 아래 글자에 마우스를 올립니다. 왼쪽 몬스터 확대 창에서 활성·수량·총 활성을 별도로 읽고, 원래 탱크의 등급·총 활성과 곱셈 결과가 일치하는 판독을 두 번 확인합니다. 같은 선택 화면의 다른 확인 결과는 유지합니다.

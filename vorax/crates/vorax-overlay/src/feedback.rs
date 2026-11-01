@@ -45,7 +45,11 @@ pub fn for_reading(r:&Reading,requested:&[usize])->Feedback {
     if r.state.phase!=vorax::advisor::ScreenPhase::Protocol {lines.push(format!("새로고침 남은 횟수: {refresh}"));}
     if !fields.is_empty() {lines.push(format!("실패 항목: {failed}"));}
     if let Some(i)=requested.first() {lines.push(format!("{}번 카드에 마우스를 올려 확대 내용을 보여 주세요.",i+1));}
+    let tank=fields.iter().find_map(|f|f.strip_prefix("tank").and_then(|s|s.split_once('.')).filter(|(_,p)|matches!(*p,"activity"|"quantity")).and_then(|(i,_)|i.parse::<usize>().ok()));
+    let tank_guide=tank.map(|i|format!("{}번 탱크 아래 글자에 마우스를 올려 왼쪽 확대 정보를 보여 주세요.",i+1));
+    if let Some(guide)=&tank_guide {lines.push(guide.clone());}
     let mut plan=Plan{pill:Some(Pill{main:title.clone(),sub:summary.clone(),dim:false}),..Plan::default()};
+    if let (Some(pill),Some(guide))=(&mut plan.pill,tank_guide) {pill.sub=guide;}
     if let Some(frame)=&r.frame {
         let l=layout_at(frame.width,frame.height,r.ui()).shifted_hand(r.hand_dy.unwrap_or(0.0));
         for i in requested {if let Some(c)=l.hand_at(size).get(*i) {plan.inspect.push((*c,230.0*l.k,340.0*l.k));}}

@@ -1,0 +1,340 @@
+{
+  "state": {
+    "tanks": [
+      {
+        "archetype": "aemberon",
+        "rarity": "normal",
+        "activity": 1,
+        "quantity": 36
+      },
+      {
+        "archetype": "boneSentry",
+        "rarity": "rare",
+        "activity": 15,
+        "quantity": 12
+      },
+      {
+        "archetype": "agito",
+        "rarity": "magic",
+        "activity": 1,
+        "quantity": 1
+      },
+      null,
+      null,
+      null
+    ],
+    "hand": [
+      "Targeted Xeno-Hormone",
+      "Slough Solution",
+      "Pure Leech Solution"
+    ],
+    "instruments": [
+      "Contracted Claws"
+    ],
+    "instrumentRounds": [
+      1
+    ],
+    "phase": "potion",
+    "round": 1,
+    "potionRefreshes": 3,
+    "instrumentRefreshes": 0,
+    "shelley": 0
+  },
+  "fields": {
+    "phase": {
+      "sure": false,
+      "guess": "potion"
+    },
+    "tank0.rarity": {
+      "sure": true,
+      "guess": "normal"
+    },
+    "tank0.archetype": {
+      "sure": true,
+      "guess": "aemberon"
+    },
+    "tank0.activity": {
+      "sure": true,
+      "guess": "1",
+      "score": 0.9166606560509101,
+      "second": 0.6198674330865541
+    },
+    "tank0.quantity": {
+      "sure": true,
+      "guess": "36",
+      "score": 0.9166606560509101,
+      "second": 0.6198674330865541
+    },
+    "tank1.rarity": {
+      "sure": true,
+      "guess": "rare"
+    },
+    "tank1.archetype": {
+      "sure": true,
+      "guess": "boneSentry"
+    },
+    "tank1.activity": {
+      "sure": true,
+      "guess": "15",
+      "score": 0.8903176401176726,
+      "second": 0.6095416426453071
+    },
+    "tank1.quantity": {
+      "sure": true,
+      "guess": "12",
+      "score": 0.8903176401176726,
+      "second": 0.6095416426453071
+    },
+    "tank2.rarity": {
+      "sure": true,
+      "guess": "magic"
+    },
+    "tank2.archetype": {
+      "sure": true,
+      "guess": "agito"
+    },
+    "tank2.activity": {
+      "sure": false,
+      "guess": "1",
+      "score": 0.5186723961513683,
+      "second": 0.45198113684612323
+    },
+    "tank2.quantity": {
+      "sure": false,
+      "guess": "1",
+      "score": 0.5186723961513683,
+      "second": 0.45198113684612323
+    },
+    "tank3.empty": {
+      "sure": true
+    },
+    "tank4.empty": {
+      "sure": true
+    },
+    "tank5.empty": {
+      "sure": true
+    },
+    "round": {
+      "sure": true,
+      "guess": "1",
+      "score": 0.8381001380088268,
+      "second": 0.4529365903576836
+    },
+    "refreshes": {
+      "sure": true,
+      "guess": "3",
+      "score": 0.9437772027478207,
+      "second": 0.6231625623573488
+    },
+    "instrument0": {
+      "sure": true,
+      "guess": "Contracted Claws",
+      "score": 0.915534876726502,
+      "second": 0.7523917237745746
+    },
+    "hand0": {
+      "sure": true,
+      "guess": "Targeted Xeno-Hormone",
+      "score": 14.0,
+      "second": 10.0
+    },
+    "hand1": {
+      "sure": true,
+      "guess": "Slough Solution",
+      "score": 8.0,
+      "second": -2.0
+    },
+    "hand2": {
+      "sure": true,
+      "guess": "Pure Leech Solution",
+      "score": 14.0,
+      "second": 6.0
+    }
+  },
+  "problems": [
+    {
+      "kind": "unreadable",
+      "field": "tank2.activity"
+    },
+    {
+      "kind": "unreadable",
+      "field": "tank2.quantity"
+    }
+  ],
+  "frame": {
+    "width": 2172,
+    "height": 931
+  },
+  "instrumentRanks": [
+    [
+      [
+        "Contracted Claws",
+        0.915534876726502
+      ],
+      [
+        "Sloughed Cortex",
+        0.7523917237745746
+      ],
+      [
+        "Clustered Eggs",
+        0.715275371958928
+      ],
+      [
+        "Incubation Sac",
+        0.6888931086987574
+      ],
+      [
+        "Aberrant Sprout",
+        0.6856514817919735
+      ],
+      [
+        "Hyperplastic Frontal Lobe",
+        0.653319423347924
+      ],
+      [
+        "Chrysalis Specimen",
+        0.6484155556907779
+      ],
+      [
+        "Eyelid Speculum",
+        0.632852515284855
+      ],
+      [
+        "Hypertrophic Pituitary",
+        0.6230129004623367
+      ],
+      [
+        "Vermicular Spinal Cord",
+        0.6208445489158746
+      ],
+      [
+        "Sinew Garrote",
+        0.5947401109797735
+      ],
+      [
+        "Egg-Burdened Butterfly",
+        0.5736042666598908
+      ],
+      [
+        "Adherent Metatarsals",
+        0.5562535826932499
+      ],
+      [
+        "Beak of the Twice-Born",
+        0.5268559674776024
+      ],
+      [
+        "Prismatic Liver",
+        0.5110422819958564
+      ],
+      [
+        "Rawhide Restraint",
+        0.5068857561232271
+      ],
+      [
+        "Two-Inch Skull Nail",
+        0.4687235807457418
+      ],
+      [
+        "Aberrant Stinger",
+        0.4427108891405727
+      ],
+      [
+        "Canine Teeth File",
+        0.43579731825782725
+      ],
+      [
+        "Nettle Toggle",
+        0.4244916067868143
+      ],
+      [
+        "Pig Iron Bone Saw",
+        0.3994527672341782
+      ],
+      [
+        "Black Goat Gut Suture",
+        0.3558875767158336
+      ],
+      [
+        "Tanned Leather Restraint",
+        0.346287554579681
+      ],
+      [
+        "Fouled Scraper",
+        0.31080878052821154
+      ],
+      [
+        "Lady of the Plague Quarter",
+        0.30287632761644445
+      ]
+    ]
+  ],
+  "handRanks": [
+    [],
+    [],
+    []
+  ],
+  "iconsKnown": [
+    "Hypertrophic Pituitary",
+    "Canine Teeth File",
+    "Aberrant Sprout",
+    "Beak of the Twice-Born",
+    "Fouled Scraper",
+    "Contracted Claws",
+    "Rawhide Restraint",
+    "Hyperplastic Frontal Lobe",
+    "Black Goat Gut Suture",
+    "Sloughed Cortex",
+    "Tanned Leather Restraint",
+    "Pig Iron Bone Saw",
+    "Sinew Garrote",
+    "Adherent Metatarsals",
+    "Egg-Burdened Butterfly",
+    "Incubation Sac",
+    "Vermicular Spinal Cord",
+    "Prismatic Liver",
+    "Eyelid Speculum",
+    "Clustered Eggs",
+    "Chrysalis Specimen",
+    "Aberrant Stinger",
+    "Nettle Toggle",
+    "Lady of the Plague Quarter",
+    "Two-Inch Skull Nail"
+  ],
+  "debug": {
+    "off": 0.161,
+    "corrected": false,
+    "tanks": [
+      {
+        "rgb": [
+          161.0,
+          160.0,
+          161.0
+        ],
+        "total": "36",
+        "aq": "1x36"
+      },
+      {
+        "rgb": [
+          235.0,
+          176.0,
+          80.0
+        ],
+        "total": "180",
+        "aq": "15x12"
+      },
+      {
+        "rgb": [
+          133.0,
+          176.0,
+          203.0
+        ],
+        "total": "120",
+        "aq": "575"
+      },
+      null,
+      null,
+      null
+    ]
+  }
+}

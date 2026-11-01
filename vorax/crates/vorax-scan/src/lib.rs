@@ -18,6 +18,7 @@ pub mod track;
 pub mod window;
 pub mod watch;
 pub mod hover;
+pub mod tank_hover;
 pub mod family;
 
 pub use data::{scan_data, ScanData};
