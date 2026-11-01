@@ -1,4 +1,4 @@
-//! Korean card titles use the bundled CPU PaddleOCR worker in this experimental branch.
+//! Korean text uses the bundled CPU PaddleOCR worker by default.
 //! Windows OCR remains explicitly selectable and is used for non-Korean languages.
 
 use vorax_scan::pixels::Img;

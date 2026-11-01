@@ -194,7 +194,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         let requested_tanks=pipe.requested_tanks();
                         let pointer_tank=super::sys::hovered_tank(game,pipe.ui());
                         if pointer_tank!=last_tank_hovered {pipe.cancel_hover_candidate();last_tank_hovered=pointer_tank;}
-                        let search=if requested.is_empty() && requested_tanks.is_empty() && !pipe.hover_dirty() {None} else {Some(vorax_scan::hover::inspect_tooltip(&frame))};
+                        let search=if requested.is_empty() && requested_tanks.is_empty() && !pipe.hover_dirty() {None} else {Some(if !requested_tanks.is_empty() || pointer_tank.is_some() {vorax_scan::hover::inspect_monster_tooltip(&frame)} else {vorax_scan::hover::inspect_tooltip(&frame)})};
                         let tip=search.as_ref().and_then(|s|s.tooltip.as_ref());
                         if !requested_tanks.is_empty() {
                             if let (Some(_),Some(engine))=(tip,ocr.as_ref()) {

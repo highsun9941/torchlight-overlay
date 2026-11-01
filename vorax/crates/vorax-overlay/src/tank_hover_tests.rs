@@ -9,7 +9,9 @@ fn popup()->Img {
     vorax_scan::window::game_view(&f).map_or_else(||f.clone(),|r|vorax_scan::window::crop_to(&f,&r))
 }
 fn expected()->TankHoverRead {
-    TankHoverRead{name:"순례자".into(),rarity:Rarity::Magic,total:120,activity:5,quantity:24,tooltip:vorax_scan::hover::tooltip(&popup()).unwrap()}
+    let search=vorax_scan::hover::inspect_monster_tooltip(&popup());
+    assert!(search.tooltip.is_some(),"{search:?}");
+    TankHoverRead{name:"순례자".into(),rarity:Rarity::Magic,total:120,activity:5,quantity:24,tooltip:search.tooltip.unwrap()}
 }
 
 #[test]

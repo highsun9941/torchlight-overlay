@@ -68,7 +68,15 @@ pub fn inspect_tooltip(img:&Img)->TooltipSearch {
 /// Normal potions have a dim grey frame. Fit all four edges independently, using the same
 /// size/aspect checks as the blue frame; scenery colour alone never identifies a card.
 #[derive(Clone,Copy)]
-enum BorderColor {Blue,Neutral,Gold}
+enum BorderColor {Blue,Neutral,Gold,Monster}
+
+/// Monster tooltips have a dimmer cyan top rim than offered cards. Keep this alternate
+/// photometric threshold separate from card recognition; four fitted edges and the monster
+/// footer, three numeric fields and product are still required by tank_hover.
+pub fn inspect_monster_tooltip(img:&Img)->TooltipSearch {
+    let ordinary=inspect_tooltip(img);
+    if ordinary.tooltip.is_some() {ordinary} else {fit_edges(img,BorderColor::Monster)}
+}
 fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
     let k=img.height as f64/1440.0;
     let make=|r:Rect|Tooltip{rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale:(r.h-12.0*k)/340.0};
@@ -81,6 +89,7 @@ fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
         mask[y*w+x]=match color {
             BorderColor::Neutral=>r.min(g).min(b)>=60 && r.max(g).max(b)-r.min(g).min(b)<=48,
             BorderColor::Blue=>b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
+            BorderColor::Monster=>b>=95 && g>=50 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
             // Scaling blends the thin rim with its dark neighbours. Keep its warm hue and
             // require four independent edges instead of relying on a high absolute brightness.
             BorderColor::Gold=>r>130 && g>70 && b<155 && r as i32-g as i32>=25 && g as i32-b as i32>=15,
@@ -131,7 +140,7 @@ fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
             || ((lb-lt+1).min(rb-rt+1) as f64)<height*0.6 {continue;}
         result.blue_pairs+=1;result.edge_score=result.edge_score.max(ts.min(bs));
         if ts>=0.7 && bs>=0.7 && ts+bs+ls+rs>rank {
-            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some(match color {BorderColor::Neutral=>"neutral_edges",BorderColor::Blue=>"blue_edges",BorderColor::Gold=>"gold_edges"});
+            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some(match color {BorderColor::Neutral=>"neutral_edges",BorderColor::Blue=>"blue_edges",BorderColor::Gold=>"gold_edges",BorderColor::Monster=>"monster_blue_edges"});
         }
     }}
     result

@@ -1,5 +1,5 @@
 //! Read the player's enlarged monster tooltip, never the animated monster in a tank.
-use crate::hover::{tooltip, Tooltip};
+use crate::hover::{inspect_monster_tooltip, Tooltip};
 use crate::pixels::{crop, resize, Img, Rect};
 use crate::reading::Reading;
 use vorax::types::Rarity;
@@ -56,7 +56,7 @@ pub fn text_crop(img: &Img, tip: &Tooltip, area: Rect) -> Img {
 
 pub fn recognize(img: &Img, read: &mut dyn FnMut(&Img)->String) -> Result<TankHoverRead,TankHoverFailure> {
     let mut texts = Vec::new();
-    let Some(tip) = tooltip(img) else { return Err(TankHoverFailure { stage:"tooltip_missing", texts }); };
+    let Some(tip) = inspect_monster_tooltip(img).tooltip else { return Err(TankHoverFailure { stage:"tooltip_missing", texts }); };
     let mut get = |area| { let s = read(&text_crop(img,&tip,area)); texts.push(s.clone()); s };
     // A potion footer must never qualify as a monster tooltip.
     let footer = get(Rect::new(0.15,0.887,0.70,0.073));
