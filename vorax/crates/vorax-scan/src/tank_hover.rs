@@ -61,10 +61,11 @@ pub fn recognize(img: &Img, read: &mut dyn FnMut(&Img)->String) -> Result<TankHo
     // A potion footer must never qualify as a monster tooltip.
     let footer = get(Rect::new(0.15,0.887,0.70,0.073));
     let Some(rarity) = rarity(&footer) else { return Err(TankHoverFailure { stage:"monster_footer", texts }); };
-    let name = get(Rect::new(0.12,0.395,0.76,0.075));
+    // The portrait ends immediately above the name. The name is diagnostic only: tank
+    // association uses its already verified category, independent compact total and pointer.
+    let name = get(Rect::new(0.25,0.418,0.50,0.060));
     let name: String = name.chars().filter(|c| crate::korean::hangul(*c) || c.is_ascii_alphabetic()).collect();
-    if name.chars().count() < 2 { return Err(TankHoverFailure { stage:"monster_name", texts }); }
-    let total = positive_number(&get(Rect::new(0.24,0.604,0.52,0.083)));
+    let total = positive_number(&get(Rect::new(0.24,0.616,0.52,0.070)));
     let activity = positive_number(&get(Rect::new(0.09,0.807,0.23,0.062)));
     let quantity = positive_number(&get(Rect::new(0.68,0.807,0.23,0.062)));
     let (Some(total),Some(activity),Some(quantity)) = (total,activity,quantity) else { return Err(TankHoverFailure { stage:"numbers", texts }); };

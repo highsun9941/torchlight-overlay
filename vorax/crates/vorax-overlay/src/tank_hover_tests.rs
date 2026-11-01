@@ -31,6 +31,8 @@ fn tank_popup_requires_monster_footer_and_three_independent_numbers() {
     let mut words=["매직몬스터","순례자","120","5","24"].into_iter();
     let result=tank_hover::recognize(&frame,&mut |_|words.next().unwrap().to_string()).unwrap();
     assert_eq!((result.activity,result.quantity,result.total),(5,24,120));
+    let mut words=["매직몬스터","","120","5","24"].into_iter();
+    assert!(tank_hover::recognize(&frame,&mut |_|words.next().unwrap().to_string()).is_ok(),"numeric recovery does not require OCR of the portrait's name");
 }
 
 #[test]
@@ -59,7 +61,8 @@ fn tank_confirmation_is_sequential_expires_and_retains_confirmed_cards() {
     assert!(!pipe.confirm_tank_hover(1,&read,0.0));
     assert!(!pipe.confirm_tank_hover(2,&read,500.0));
     assert!(!pipe.confirm_tank_hover(2,&read,3100.0),"old observations expire");
-    assert!(pipe.confirm_tank_hover(2,&read,3600.0));
+    let mut second=read.clone();second.name.clear();
+    assert!(pipe.confirm_tank_hover(2,&second,3600.0),"stable numeric evidence survives a missing diagnostic name");
     assert!(pipe.requested_tanks().is_empty());assert!(pipe.hover_dirty());
     let after=pipe.pending().unwrap();assert!(trustworthy(after));assert_eq!(after.state.hand,cards);
     assert_eq!((after.state.tanks[2].as_ref().unwrap().activity,after.state.tanks[2].as_ref().unwrap().quantity),(5,24));

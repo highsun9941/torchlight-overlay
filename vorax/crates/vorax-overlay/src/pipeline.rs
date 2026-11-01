@@ -72,7 +72,7 @@ pub struct Pipeline {
     zoom_board: String,
     zoom_names: std::collections::BTreeMap<usize, String>,
     zoom_candidate: Option<(usize, String, f64)>,
-    tank_candidate: Option<(usize, String, vorax::types::Rarity, i64, i64, f64)>,
+    tank_candidate: Option<(usize, vorax::types::Rarity, i64, i64, f64)>,
     zoom_dirty: bool,
     memory: crate::round_memory::RoundMemory,
     /// this game reached the Surgical Protocols (rounds 11-13): a board after them with no cards in hand is the game
@@ -146,8 +146,8 @@ impl Pipeline {
     pub fn confirm_tank_hover(&mut self, slot:usize, read:&vorax_scan::tank_hover::TankHoverRead, now:f64) -> bool {
         if !self.requested_tanks().contains(&slot) || self.pending.as_ref().and_then(|r|vorax_scan::tank_hover::target(read,r,Some(slot)))!=Some(slot)
             || read.activity.checked_mul(read.quantity)!=Some(read.total) || !(1..=1_000_000).contains(&read.activity) || !(1..=1_000_000).contains(&read.quantity) {return false;}
-        let same=self.tank_candidate.as_ref().is_some_and(|(i,n,r,a,q,t)|*i==slot && n==&read.name && r==&read.rarity && *a==read.activity && *q==read.quantity && (350.0..=2500.0).contains(&(now-*t)));
-        if !same {self.tank_candidate=Some((slot,read.name.clone(),read.rarity,read.activity,read.quantity,now));return false;}
+        let same=self.tank_candidate.as_ref().is_some_and(|(i,r,a,q,t)|*i==slot && r==&read.rarity && *a==read.activity && *q==read.quantity && (350.0..=2500.0).contains(&(now-*t)));
+        if !same {self.tank_candidate=Some((slot,read.rarity,read.activity,read.quantity,now));return false;}
         self.tank_candidate=None;self.zoom_dirty=true;
         if let Some(r)=&mut self.pending {
             let m=r.state.tanks[slot].as_mut().unwrap();m.activity=read.activity;m.quantity=read.quantity;

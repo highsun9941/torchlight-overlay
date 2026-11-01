@@ -1,6 +1,6 @@
-# Korean CPU OCR experiment
+# Korean CPU OCR research
 
-Branch: `hf-korean-ocr-cpu`; baseline: v1.2.7. This branch is separate from main.
+Experiment branch: `hf-korean-ocr-cpu`; baseline: v1.2.7. The tested CPU backend becomes the Korean default in stable v1.2.8. The selection and benchmark notes below record the original experiment.
 
 ## Model selection
 
