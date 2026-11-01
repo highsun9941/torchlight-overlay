@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="../../../vorax/fixtures/tank-tooltip/activity-crop.png" Link="fixtures/tank-activity.png" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\..\src\Tartarus.Rules\Tartarus.Rules.csproj" />
     <ProjectReference Include="..\..\src\Tartarus.Solver\Tartarus.Solver.csproj" />
     <ProjectReference Include="..\..\src\Tartarus.Vision\Tartarus.Vision.csproj" />

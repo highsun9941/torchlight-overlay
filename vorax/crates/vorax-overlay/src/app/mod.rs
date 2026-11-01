@@ -6,6 +6,8 @@ mod diagnostics;
 mod menu;
 mod logview;
 pub(crate) mod ocr;
+mod paddle;
+mod ocr_validation;
 mod sys;
 mod update;
 mod window;
@@ -117,6 +119,12 @@ pub fn run(args: &[String]) {
     if let Some(i) = args.iter().position(|a| a == "--selftest") {
         return selftest(args.get(i + 1).map(PathBuf::from).unwrap_or_else(std::env::temp_dir));
     }
+    if let Some(i) = args.iter().position(|a| a == "--ocr-validate") {
+        if let (Some(input), Some(out)) = (args.get(i + 1), args.get(i + 2)) {
+            if let Err(e)=ocr_validation::run(PathBuf::from(input).as_path(),PathBuf::from(out).as_path()) {eprintln!("{e}");std::process::exit(1);}
+            return;
+        }
+    }
     if let Some(i) = args.iter().position(|a| a == "--inspect") {
         if let (Some(input), Some(out)) = (args.get(i + 1), args.get(i + 2)) {
             return inspect_frame(&PathBuf::from(input), &PathBuf::from(out));
@@ -207,6 +215,8 @@ fn inspect_frame(input: &std::path::Path, out: &std::path::Path) {
     let value = serde_json::json!({
         "outcome": kind,
         "ocrLanguage": ocr.as_ref().map(|o| &o.language),
+        "ocrBackend": ocr.as_ref().map(|o| &o.backend),
+        "ocrDetails": ocr.as_ref().map(|o|o.details()),
         "blockingFields": reading.as_ref().map(|r| r.blocking_fields()),
         "reading": reading,
     });

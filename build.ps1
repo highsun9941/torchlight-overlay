@@ -26,6 +26,14 @@ if (!$SkipNative) {
 }
 & dotnet publish (Join-Path $taskRoot 'tartarus/src/Tartarus.App/Tartarus.App.csproj') -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:SentryDsn= -o $out
 if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed.' }
+$ocrStage = Join-Path $taskRoot '.publish/ocr-worker'
+& dotnet publish (Join-Path $taskRoot 'tartarus/tools/Vorax.OcrHost/Vorax.OcrHost.csproj') -c Release -p:Platform=x64 -r win-x64 --self-contained true -o $ocrStage
+if ($LASTEXITCODE -ne 0) { throw 'CPU OCR worker publish failed.' }
+# The helper already contains the same .NET/vision/ONNX dependencies. A console publish into
+# its folder can replace Windows Desktop assemblies with the console runtime's facades.
+foreach ($name in 'Vorax.OcrHost.exe','Vorax.OcrHost.dll','Vorax.OcrHost.deps.json','Vorax.OcrHost.runtimeconfig.json') {
+    Copy-Item -LiteralPath (Join-Path $ocrStage $name) -Destination $out -Force
+}
 Copy-Item -Path (Join-Path $taskRoot 'tartarus/models') -Destination $out -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'vorax/target/release/vorax-overlay.exe') -Destination $out -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.ko.md') -Destination (Join-Path $out 'README.ko.md') -Force

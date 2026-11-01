@@ -238,3 +238,11 @@ pub fn hovered_card(hwnd:Hwnd, ui:f64, size:usize)->Option<usize> {
         (dx.abs()<115.0*l.k && dy.abs()<190.0*l.k).then_some((i,dx.abs()))
     }).min_by(|a,b|a.1.total_cmp(&b.1)).map(|p|p.0)
 }
+
+/// Read the player's cursor; never move it or generate game input.
+pub fn hovered_tank(hwnd:Hwnd, ui:f64)->Option<usize> {
+    let (cx,cy,w,h)=client_rect(hwnd)?;
+    let mut point=windows::Win32::Foundation::POINT::default();
+    unsafe {windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point).ok()?;}
+    vorax_scan::tank_hover::pointer_tank(w as usize,h as usize,ui,(point.x-cx) as f64,(point.y-cy) as f64)
+}

@@ -8,6 +8,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        int previewArg=Array.IndexOf(e.Args,"--preview-ui");
+        _previewOutput=previewArg>=0 && previewArg+1<e.Args.Length ? e.Args[previewArg+1] : null;
         // The interface is in English (localization comes later): numbers as "12,800" and "6.4" whatever Windows' language.
         System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
@@ -48,6 +50,7 @@ public partial class App : Application
     }
 
     private UiWatchdog? _watchdog;
+    private string? _previewOutput;
 
     protected override void OnExit(ExitEventArgs e)
     {
@@ -58,6 +61,14 @@ public partial class App : Application
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         e.Handled = true;
+        // A diagnostic preview must report its exception and exit, rather than wait forever
+        // on an error dialog on an unattended build machine.
+        if (_previewOutput is { } preview)
+        {
+            try { System.IO.Directory.CreateDirectory(preview); System.IO.File.WriteAllText(System.IO.Path.Combine(preview,"preview-error.txt"),e.Exception.ToString()); }
+            finally { Shutdown(1); }
+            return;
+        }
         try { System.IO.File.AppendAllText(AppSettings.LogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Error: {e.Exception}{Environment.NewLine}"); }
         catch { }
         // The app goes on: the player may send a report of it, with what was on screen.

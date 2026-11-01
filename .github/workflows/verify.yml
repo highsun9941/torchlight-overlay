@@ -84,6 +84,42 @@ jobs:
         run: dotnet test tartarus/tests/Tartarus.Rules.Tests/Tartarus.Rules.Tests.csproj -c Release -p:Platform=x64 --logger trx
       - name: Build portable Windows helper
         run: ./build.ps1
+      - name: Read reported cards and tank tooltip with the actual Korean CPU model
+        id: ocr_validation
+        env:
+          VORAX_LANGUAGE: ko
+          VORAX_OCR_MODE: accurate
+          VORAX_OCR_BACKEND: paddle
+          VORAX_OCR_THREADS: 1
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'paddle-ocr-validation'
+          $fixtures = (Resolve-Path 'vorax/fixtures').Path
+          $args = '--ocr-validate "' + $fixtures + '" "' + $out + '"'
+          $process = Start-Process ./release/TorchlightHelper-KO/vorax-overlay.exe -ArgumentList $args -Wait -PassThru
+          $report = Join-Path $out 'model-validation.json'
+          if (Test-Path $report) { Write-Host (Get-Content $report -Raw) }
+          if ($process.ExitCode -ne 0 -or !(Test-Path $report)) { throw 'Actual Korean PaddleOCR validation failed' }
+      - name: Measure one and two CPU threads without OCR result caching
+        if: always() && steps.ocr_validation.outcome != 'skipped'
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'paddle-ocr-validation'
+          if (!(Test-Path $out)) { exit 0 }
+          foreach ($threads in 1,2) {
+            $json = & ./release/TorchlightHelper-KO/Vorax.OcrHost.exe --benchmark $out --threads $threads
+            if ($LASTEXITCODE -ne 0) { throw 'CPU OCR benchmark failed' }
+            $json | Set-Content (Join-Path $out "benchmark-$threads.json") -Encoding utf8
+            $result = $json | ConvertFrom-Json
+            $warm = @($result.records | ForEach-Object { $_.readings | Select-Object -Skip 1 | ForEach-Object { $_.InferenceMs } }) | Sort-Object
+            if ($warm.Count) { Write-Host "PADDLE_CPU threads=$threads warm_median_ms=$($warm[[int]($warm.Count/2)]) working_set_bytes=$($result.workingSetBytes)" }
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && steps.ocr_validation.outcome != 'skipped'
+        with:
+          name: Korean-CPU-OCR-validation
+          path: ${{ runner.temp }}/paddle-ocr-validation/
+          if-no-files-found: warn
       - name: Verify production reader on Korean screenshots
         env:
           VORAX_LANGUAGE: ko
@@ -105,20 +141,22 @@ jobs:
           New-Item -ItemType Directory -Force $data | Out-Null
           '{"VoraxCpuMode":3,"ShelleyLevel":0,"SettingsVersion":2}' | Set-Content "$data/settings.json"
           $preview = Join-Path $env:RUNNER_TEMP 'helper-ui'
-          $process = Start-Process ./release/TorchlightHelper-KO/TorchlightHelper.exe -ArgumentList "--preview-ui $preview" -Wait -PassThru
+          $process = Start-Process ./release/TorchlightHelper-KO/TorchlightHelper.exe -ArgumentList "--preview-ui $preview" -PassThru
+          if (!$process.WaitForExit(60000)) { Stop-Process -Id $process.Id -Force; throw 'Helper UI preview timed out' }
+          if (Test-Path "$preview/preview-error.txt") { Write-Host (Get-Content "$preview/preview-error.txt" -Raw) }
           if ($process.ExitCode -ne 0 -or !(Test-Path "$preview/vorax-ui.png")) { throw 'Helper UI preview failed' }
       - name: Package and verify file hashes
         run: python package.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TorchlightHelper-1.2.7-win-x64
+          name: TorchlightHelper-1.2.8-win-x64
           path: |
             release/*.zip
             release/*.sha256
           if-no-files-found: error
   release:
-    name: Publish verified Windows download
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    name: Publish verified stable release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [rust, windows]
     runs-on: ubuntu-latest
     permissions:
@@ -127,12 +165,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: TorchlightHelper-1.2.7-win-x64
+          name: TorchlightHelper-1.2.8-win-x64
           path: release
       - name: Publish release after both test suites pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v1.2.7 >/dev/null 2>&1; then
-            gh release create v1.2.7 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.7 — 금색 확대 카드 및 짧은 제목 인식" --notes-file RELEASE_NOTES.md
+          if ! gh release view v1.2.8 >/dev/null 2>&1; then
+            gh release create v1.2.8 release/*.zip release/*.sha256 --target "${{ github.sha }}" --latest --title "Torchlight Helper 1.2.8 — 한국어 CPU OCR · 탱크 확대 인식" --notes-file RELEASE_NOTES.md
           fi

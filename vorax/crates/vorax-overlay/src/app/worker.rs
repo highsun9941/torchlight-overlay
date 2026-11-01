@@ -56,11 +56,11 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
     let ocr = if opts.ocr {
         match Ocr::new() {
             Ok(o) => {
-                note(&format!("card titles read with Windows OCR ({})", o.language));
+                note(&format!("card titles read with {} ({}): {}", o.backend,o.language,o.details()));
                 Some(o)
             }
             Err(e) => {
-                note(&format!("no Windows OCR ({e}): cards read by their pictures"));
+                note(&format!("OCR startup failed ({e}): cards read by their pictures"));
                 None
             }
         }
@@ -75,6 +75,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
     let mut last_visual_poll = Instant::now() - VISUAL_POLL;
     let mut last_heartbeat=Instant::now();
     let mut last_hovered=None;
+    let mut last_tank_hovered=None;
     let mut last_hover_wait=Instant::now()-Duration::from_secs(3);
     let mut follower: Option<Follower> = None;
     let mut looked_for_log = Instant::now() - Duration::from_secs(60);
@@ -152,7 +153,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         if last_log_check.elapsed() >= Duration::from_secs(1) {
             last_log_check = Instant::now();
             if last_heartbeat.elapsed()>=Duration::from_secs(10) {
-                diagnostics::event(0,"watch_heartbeat",serde_json::json!({"capture":capturer.state(),"pendingSlots":pipe.requested_slots(),"pointerSlot":last_hovered,"foreground":super::sys::foreground().0,"lastChange":watch.last_difference,"retries":retries}));
+                diagnostics::event(0,"watch_heartbeat",serde_json::json!({"capture":capturer.state(),"pendingSlots":pipe.requested_slots(),"pendingTanks":pipe.requested_tanks(),"pointerSlot":last_hovered,"pointerTank":last_tank_hovered,"foreground":super::sys::foreground().0,"lastChange":watch.last_difference,"retries":retries}));
                 last_heartbeat=Instant::now();
             }
             game_open_since = if find_game_window().is_some() { game_open_since.or(Some(Instant::now())) } else { None };
@@ -190,9 +191,45 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                         last_hovered=hovered;
                         let mut inspecting=false;
                         let requested=pipe.requested_slots();
-                        let search=if requested.is_empty() && !pipe.hover_dirty() {None} else {Some(vorax_scan::hover::inspect_tooltip(&frame))};
+                        let requested_tanks=pipe.requested_tanks();
+                        let pointer_tank=super::sys::hovered_tank(game,pipe.ui());
+                        if pointer_tank!=last_tank_hovered {pipe.cancel_hover_candidate();last_tank_hovered=pointer_tank;}
+                        let search=if requested.is_empty() && requested_tanks.is_empty() && !pipe.hover_dirty() {None} else {Some(if !requested_tanks.is_empty() || pointer_tank.is_some() {vorax_scan::hover::inspect_monster_tooltip(&frame)} else {vorax_scan::hover::inspect_tooltip(&frame)})};
                         let tip=search.as_ref().and_then(|s|s.tooltip.as_ref());
-                        if !requested.is_empty() {
+                        if !requested_tanks.is_empty() {
+                            if let (Some(_),Some(engine))=(tip,ocr.as_ref()) {
+                                inspecting=true;
+                                let hover_id=diagnostics::next_scan();
+                                let mut texts=Vec::new();let mut crops=Vec::new();
+                                let mut text=|crop:&vorax_scan::Img| {
+                                    let result=engine.read(crop);
+                                    let value=result.as_ref().ok().cloned().unwrap_or_default();
+                                    texts.push(serde_json::json!({"size":[crop.width,crop.height],"text":value,"error":result.err().map(|e|e.to_string())}));
+                                    crops.push(crop.clone());value
+                                };
+                                let result=vorax_scan::tank_hover::recognize(&frame,&mut text);
+                                drop(text);
+                                let slot=result.as_ref().ok().and_then(|r|pipe.pending().and_then(|p|vorax_scan::tank_hover::target(r,p,pointer_tank))).filter(|i|requested_tanks.contains(i));
+                                diagnostics::event(hover_id,"tank_hover_ocr",serde_json::json!({"slot":slot,"pointerTank":pointer_tank,"requested":requested_tanks,"result":result,"ocr":texts}));
+                                if result.is_err() || slot.is_none() {diagnostics::save(hover_id,"tank_hover_unverified",&frame,None,pipe.pending(),&texts,&crops,serde_json::json!({"slot":slot,"result":result}));}
+                                if let (Ok(read),Some(slot))=(result,slot) {
+                                    if pipe.confirm_tank_hover(slot,&read,now_ms()) {
+                                        diagnostics::event(hover_id,"tank_hover_confirmed",serde_json::json!({"slot":slot,"name":read.name,"activity":read.activity,"quantity":read.quantity,"total":read.total,"remaining":pipe.requested_tanks()}));
+                                        status("탱크 확대 인식 완료",&format!("{}번 탱크: 활성 {} × 수량 {} = {}. 다음 파란 위치로 옮기거나 탱크 밖으로 마우스를 옮겨 주세요.",slot+1,read.activity,read.quantity,read.total),&pipe.progress());
+                                        if let Some(r)=pipe.pending() {send(ToUi::Show(crate::feedback::for_reading(r,&pipe.requested_slots()).plan,frame.width,frame.height));}
+                                    } else {status("탱크 확대 스캔 확인 중",&format!("{}번 탱크의 활성·수량·총 활성을 한 번 더 확인합니다.",slot+1),"같은 수치 두 번 확인");}
+                                } else {
+                                    status(&format!("{}번 탱크 확대 확인 필요",requested_tanks[0]+1),"탱크 아래 글자에 마우스를 유지해 왼쪽 몬스터 확대 창을 보여 주세요.",&pipe.progress());
+                                }
+                            } else {
+                                pipe.cancel_hover_candidate();
+                                if last_hover_wait.elapsed()>=Duration::from_secs(3) {
+                                    diagnostics::event(0,"tank_hover_wait",serde_json::json!({"reason":if tip.is_none(){"tooltip_missing"}else{"ocr_unavailable"},"requested":requested_tanks,"pointerTank":pointer_tank,"tooltipSearch":search}));
+                                    status(&format!("{}번 탱크 확대 화면 대기",requested_tanks[0]+1),"파란 탱크 아래 글자에 마우스를 올려 왼쪽 확대 정보를 보여 주세요.",&pipe.progress());
+                                    last_hover_wait=Instant::now();
+                                }
+                            }
+                        } else if !requested.is_empty() {
                             if let (Some(_),Some(engine),Some(pending))=(tip.as_ref(),ocr.as_ref(),pipe.pending()) {
                                 inspecting=true;
                                 let phase=match pending.state.phase {vorax::advisor::ScreenPhase::Potion=>"potion",vorax::advisor::ScreenPhase::Instrument=>"instrument",_=>"protocol"};
@@ -233,7 +270,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                             }
                         } else {pipe.cancel_hover_candidate();}
                         if pipe.hover_dirty() {
-                            if hovered.is_some() && tip.is_some() {inspecting=true;}
+                            if (hovered.is_some() || pointer_tank.is_some()) && tip.is_some() {inspecting=true;}
                             else {visual=true;}
                         }
                         match watch.observe(&frame, pipe.ui(), now_ms()) {
@@ -284,7 +321,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             // while it reads and only change if what it finds does
             let quiet = relook && due.is_none() && !manual && again.is_none() && !visual;
             let retry_reason = read(&capturer, ocr.as_ref(), &mut pipe, &mut watch, trigger, manual || relook, quiet, opts.frames.as_deref(), &send);
-            if (retry_reason == RetryReason::Uncertain && !pipe.requested_slots().is_empty()) || retry_reason == RetryReason::None || quiet {
+            if (retry_reason == RetryReason::Uncertain && (!pipe.requested_slots().is_empty() || !pipe.requested_tanks().is_empty())) || retry_reason == RetryReason::None || quiet {
                 retries = 0;
             } else if retries < RETRIES {
                 retries += 1;
