@@ -170,18 +170,20 @@ pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn F
     let art=crate::cards::rank_card_art(img,&c,tip.scale,phase,data);
     let names=match phase {"instrument"=>&data.names.instrument,"protocol"=>&data.names.protocol,_=>&data.names.potion};
     let (heading,title_area)=crate::titles::located_heading(img,&c,tip.scale,true);
-    let mut attempts=vec![heading,crate::titles::title_crop(img,&c,tip.scale)];
+    let mut attempts=vec![heading,crate::titles::family_crop(img,&c,tip.scale),crate::titles::title_crop(img,&c,tip.scale)];
     let mut title_ranks=Vec::new();let mut fragments=Vec::new();
     for crop in attempts.drain(..) {
-        let text=read(&crop);
-        texts.push(text.clone());
-        let mut ranks:Vec<_>=names.iter().map(|n|(n,crate::titles::name_fit(n,&text))).collect();
+        let part=read(&crop);texts.push(part.clone());
+        let text=if texts.len()==2 {format!("{}\n{part}",texts[0])} else {part};
+        let mut ranked:Vec<_>=names.iter().map(|n|(n.clone(),crate::titles::name_fit(n,&text))).collect();
+        crate::family::rerank(&mut ranked,&text,names);
+        let mut ranks:Vec<_>=ranked.iter().map(|(n,q)|(n,*q)).collect();
         ranks.sort_by(|a,b|b.1.total_cmp(&a.1));
         let Some((name,q))=ranks.first() else {continue;};
         title_ranks=ranks.iter().take(3).map(|(n,q)|((*n).clone(),*q)).collect();
         let score=art.iter().find(|(n,_)|n==*name).map_or(0.0,|x|x.1);
         let supported=original.is_empty() || original.iter().all(|(_,s)|*s<0.90) || original.iter().any(|(n,s)|n==*name&&*s>=0.90);
-        if *q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0 && score>=0.92 && supported {
+        if *q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0 && score>=0.92 && supported && crate::family::verified(name,&text,names) {
             return Ok(HoverRead {name:(*name).clone(),text,title_score:*q,art_score:score,tooltip:tip,title_area,match_kind:"complete_title".into()});
         }
         if !(*q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0) {
@@ -191,7 +193,7 @@ pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn F
                 let name=*name;
                 let score=art.iter().find(|(n,_)|n.as_str()==name).map_or(0.0,|x|x.1);
                 let supported=original.is_empty() || original.iter().all(|(_,s)|*s<0.90) || original.iter().any(|(n,s)|n.as_str()==name&&*s>=0.90);
-                if score>=0.92 && supported {
+                if score>=0.92 && supported && crate::family::verified(name,&text,names) {
                     return Ok(HoverRead{name:name.to_string(),title_score:crate::titles::name_fit(name,&text),text,art_score:score,tooltip:tip,title_area,match_kind:"unique_fragments".into()});
                 }
             }

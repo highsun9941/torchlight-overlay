@@ -207,7 +207,7 @@ fn read_at_impl(img: &Img, l: &Layout, size: usize, phase: &str, data: &ScanData
         let key = format!("hand{j}");
         let top = ranked.first();
         let second = ranked.get(1).map(|r| r.1);
-        let ambiguous_art = !use_text && top.is_some_and(|t| t.1 < ART_MIN || t.1 - second.unwrap_or(0.0) < ART_GAP);
+        let ambiguous_art = !use_text && top.is_some_and(|t| crate::family::is_variant(&t.0) || t.1 < ART_MIN || t.1 - second.unwrap_or(0.0) < ART_GAP);
         if top.is_none_or(|t| t.1 < ART_UNKNOWN) || ambiguous_art {
             problems.push(Problem::UnknownArt { field: key.clone(), crop: card_face(c, l.k), hand: (size == 5).then_some(5), text: None });
             fields.insert(key, FieldRead { sure: false, guess: top.map(|t| t.0.clone()), score: top.map(|t| t.1), second });

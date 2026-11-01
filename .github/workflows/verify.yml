@@ -40,6 +40,10 @@ jobs:
         env:
           VORAX_QA_CROPS: 1
         run: cargo test --release --locked --manifest-path vorax/Cargo.toml -p vorax-overlay reported_counter_failure_is_visible_with_no_actionable_advice -- --nocapture --test-threads=1
+      - name: Render the wrapped species OCR input
+        env:
+          VORAX_QA_CROPS: 1
+        run: cargo test --release --locked --manifest-path vorax/Cargo.toml -p vorax-overlay the_species_text_crop_preserves_the_wrapped_title_and_description -- --nocapture --test-threads=1
       - name: Prepare Korean OCR capability on the temporary test runner
         if: github.event_name == 'workflow_dispatch'
         shell: powershell
@@ -103,7 +107,7 @@ jobs:
         run: python package.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TorchlightHelper-1.2.5-win-x64
+          name: TorchlightHelper-1.2.6-win-x64
           path: |
             release/*.zip
             release/*.sha256
@@ -119,12 +123,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: TorchlightHelper-1.2.5-win-x64
+          name: TorchlightHelper-1.2.6-win-x64
           path: release
       - name: Publish release after both test suites pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v1.2.5 >/dev/null 2>&1; then
-            gh release create v1.2.5 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.5 — 실패 위치 표시 및 횟수 판독" --notes-file RELEASE_NOTES.md
+          if ! gh release view v1.2.6 >/dev/null 2>&1; then
+            gh release create v1.2.6 release/*.zip release/*.sha256 --target "$GITHUB_SHA" --title "Torchlight Helper 1.2.6 — 몬스터 종류 검증 및 텍스트 변경 감지" --notes-file RELEASE_NOTES.md
           fi
