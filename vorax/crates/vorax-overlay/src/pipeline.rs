@@ -136,9 +136,13 @@ impl Pipeline {
         self.pending.as_ref().map_or_else(Vec::new,|r| {
             let size=r.hand_ranks.as_ref().map_or(r.hand_size.unwrap_or(3),|h|h.len().max(3));
             (0..size).map(|i| {
-                let ranks=if let Some(name)=r.fields.get(&format!("hand{i}")).filter(|f|f.sure).and_then(|f|f.guess.as_ref()) {
+                let field=r.fields.get(&format!("hand{i}"));
+                let mut ranks=if let Some(name)=field.filter(|f|f.sure).and_then(|f|f.guess.as_ref()) {
                     vec![(name.clone(),1.0)]
                 } else {r.hand_ranks.as_ref().and_then(|h|h.get(i)).cloned().unwrap_or_default()};
+                if let Some(stem)=field.filter(|f|!f.sure && f.score.is_some_and(|s|s>=6.0)).and_then(|f|f.guess.as_deref()).and_then(|n|n.split_once(" - ").map(|(s,_)|s)) {
+                    ranks.retain(|(n,_)|n.split_once(" - ").is_some_and(|(s,_)|s==stem));
+                }
                 (i,ranks)
             }).collect()
         })
@@ -397,6 +401,103 @@ mod tests {
 
     fn round_ten(file:&str)->super::Img {
         super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round10").join(file)).unwrap()
+    }
+    fn variant_motion(file:&str)->super::Img {
+        let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/variant-motion").join(file)).unwrap();
+        super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
+    }
+    fn species_replay(body:bool)->impl FnMut(&super::Img)->String {
+        let mut slot=0;
+        move |img:&super::Img| {
+            if (img.width,img.height)==(464,120) {slot+=1;}
+            match slot {
+                1=>if (img.width,img.height)==(464,120) {""} else {"강력 이통 제거 가루\n1 그륜 몬스터를"},
+                2=>if body && (img.width,img.height)==(432,320) {
+                    // A controlled positive OCR response from the visible species line. The negative
+                    // response below is the actual recorded heading that produced the wrong Pest.
+                    "1 그룹 해골 경비병을 첨가하여 수량 +73"
+                } else {"마이크로엘 리다 가루와•테"},
+                _=>"표적 이종 호르몬",
+            }.to_string()
+        }
+    }
+    #[test]
+    fn the_recorded_shared_title_prefix_cannot_advise_the_wrong_pest_variant() {
+        use super::*;
+        if !production_korean_case("the_recorded_shared_title_prefix_cannot_advise_the_wrong_pest_variant") {return;}
+        let frame=variant_motion("bone-before.png");let raw=scan(&frame,scan_data(),true);
+        assert!(!raw.fields.get("hand1").is_some_and(|f|f.sure && f.guess.as_deref()==Some("Slender-Limb Powder - Pest")));
+        let mut pipe=Pipeline::new(0);let mut text=species_replay(false);
+        match pipe.run(&frame,None,Some(&mut text)) {
+            Outcome::Uncertain{reading}=>{
+                assert!(!reading.fields["hand1"].sure);assert!(reading.blocking_fields().contains(&"hand1".into()));
+                assert_eq!(pipe.requested_slots(),[1]);
+            },
+            _=>panic!("the clipped species suffix must request enlargement, not advise Pest"),
+        }
+    }
+    #[test]
+    fn a_visible_species_line_resolves_the_bone_variant_and_survives_animation() {
+        use super::*;
+        if !production_korean_case("a_visible_species_line_resolves_the_bone_variant_and_survives_animation") {return;}
+        let mut pipe=Pipeline::new(0);let mut text=species_replay(true);
+        match pipe.run(&variant_motion("bone-before.png"),None,Some(&mut text)) {
+            Outcome::Advice{reading,..}=>{assert_eq!(reading.state.hand[1],"Slender-Limb Powder - Bone Sentry");assert_eq!(reading.state.round,Some(6));},
+            Outcome::Uncertain{reading}=>panic!("species line must resolve the family: {}",serde_json::to_string(&reading).unwrap()),
+            _=>panic!("expected a verified bone variant"),
+        }
+        let mut no_repeat=|_:&Img|->String{panic!("unchanged species evidence must remain confirmed")};
+        match pipe.run(&variant_motion("bone-after.png"),None,Some(&mut no_repeat)) {
+            Outcome::Advice{reading,..}=>assert_eq!(reading.state.hand[1],"Slender-Limb Powder - Bone Sentry"),
+            _=>panic!("animation must not lose the confirmed species"),
+        }
+    }
+    #[test]
+    fn anchored_text_ignores_reported_animation_but_still_detects_changed_letters() {
+        use super::*;
+        use vorax_scan::watch::{Change,ScreenWatch};
+        let before=variant_motion("bone-before.png");let after=variant_motion("bone-after.png");
+        let mut watch=ScreenWatch::default();watch.accept(&before,1.0);
+        for i in 0..20 {
+            let img=if i%2==0 {&after} else {&before};
+            assert_eq!(watch.observe(img,1.0,i as f64*500.0),Change::Unchanged,"{:?}",watch.last_difference);
+            assert!(watch.compare(img,1.0).is_empty(),"animation cannot veto the same completed read");
+        }
+        let mut changed=before.clone();let l=layout_at(changed.width,changed.height,1.0);let c=l.cards[1];
+        let r=vorax_scan::pixels::Rect::new(c.cx-80.0*l.k,c.cy-5.0*l.k,160.0*l.k,18.0*l.k);
+        for y in r.y.floor() as usize..(r.y+r.h).ceil() as usize {for x in r.x.floor() as usize..(r.x+r.w).ceil() as usize {
+            changed.data[(y*changed.width+x)*4..][..4].copy_from_slice(&[20,20,20,255]);
+        }}
+        assert_eq!(watch.observe(&changed,1.0,11000.0),Change::Changed,"a changed wrapped species line is still a real change");
+    }
+    #[test]
+    fn moving_monsters_inside_glass_are_not_inputs_to_the_watcher() {
+        use super::*;
+        use vorax_scan::watch::{Change,ScreenWatch};
+        let frame=variant_motion("bone-before.png");let l=layout_at(frame.width,frame.height,1.0);
+        let mut watch=ScreenWatch::default();watch.accept(&frame,1.0);
+        for step in 0..4 {
+            let mut moved=frame.clone();
+            for glass in &l.tank_glass {
+                for y in glass.y.ceil() as usize..(glass.y+glass.h).floor() as usize {for x in glass.x.max(0.0).ceil() as usize..(glass.x+glass.w).min(frame.width as f64).floor() as usize {
+                    let value=if (x+y+step)%2==0 {220} else {15};moved.data[(y*frame.width+x)*4..][..4].copy_from_slice(&[value,40,70,255]);
+                }}
+            }
+            assert_eq!(watch.observe(&moved,1.0,step as f64*500.0),Change::Unchanged,"glass animation must be excluded: {:?}",watch.last_difference);
+        }
+    }
+    #[test]
+    fn the_species_text_crop_preserves_the_wrapped_title_and_description() {
+        use super::*;
+        let frame=variant_motion("bone-before.png");let l=layout_at(frame.width,frame.height,1.0);
+        let crop=vorax_scan::titles::family_crop(&frame,&l.cards[1],l.k);
+        assert_eq!((crop.width,crop.height),(432,320));
+        let ink=(80..155).flat_map(|y|(50..382).map(move|x|(x,y))).filter(|&(x,y)|crop.px(x,y).0<100).count();
+        assert!(ink>300,"the wrapped species text must remain in the OCR input");
+        if std::env::var_os("VORAX_QA_CROPS").is_some() {
+            let path=std::env::temp_dir().join("species-body.png");encode_png(&path,crop.width as u32,crop.height as u32,&crop.data).unwrap();
+            let hex=std::fs::read(path).unwrap().iter().map(|b|format!("{b:02x}")).collect::<String>();println!("QA_VARIANT body {hex}");
+        }
     }
     /// main() selects Korean before the reader runs. A child test process reproduces that setup
     /// without racing other parallel tests by mutating their shared language environment.

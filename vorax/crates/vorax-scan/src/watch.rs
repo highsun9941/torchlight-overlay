@@ -5,7 +5,7 @@ use crate::pixels::{gray, Img, Rect};
 #[derive(Clone)]
 struct Area { name: String, values: Vec<f32>, ignored: bool }
 #[derive(Clone)]
-struct Stamp { size: (usize, usize), ui: f64, present: usize, tooltip:bool, areas: Vec<Area>, tanks:Vec<Option<String>> }
+struct Stamp { size: (usize, usize), ui: f64, present: usize, tooltip:bool, areas: Vec<Area>, tanks:Vec<Option<String>>, hand_size:usize, anchors:Vec<Option<Rect>> }
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct Difference {
@@ -15,7 +15,7 @@ pub struct Difference {
 }
 
 impl Stamp {
-    fn new(img: &Img, ui: f64, hovered: Option<usize>) -> Self {
+    fn new(img: &Img, ui: f64, hovered: Option<usize>, reference:Option<&Self>, relocate:bool) -> Self {
         let l = layout_at(img.width, img.height, ui);
         let tooltip=crate::hover::tooltip(img).map(|t|t.rect);
         let moving=tooltip.is_some() || hovered.is_some();
@@ -27,26 +27,35 @@ impl Stamp {
         add("round".into(), l.round, true, false);
         add("refreshes".into(), l.refresh, true, false);
         // Unused fan positions contain animated scenery on a three-card offer.
-        let size = crate::cards::fan_size(img, &l);
+        let reference=reference.filter(|r|!relocate && r.size==(img.width,img.height) && r.ui==ui);
+        let size = reference.map_or_else(||crate::cards::fan_size(img,&l),|r|r.hand_size);
         let mut titles=Vec::new();
+        let mut anchors=Vec::new();
         for (i, c) in l.hand_at(size).iter().enumerate() {
             // Enlarging one offer also slides its neighbours. Round, refreshes, validated tanks and
             // the instrument panel still detect actual actions while this temporary fan motion is masked.
             add(format!("hand{i}.title"), Rect::new(c.cx-100.0*l.k,c.cy-32.0*l.k,200.0*l.k,38.0*l.k), true, moving);
-            let (heading,area)=crate::titles::located_heading(img,c,l.k,false);
-            // An unlocated/short fragment must keep the original narrow-region comparison:
-            // even a small suffix change can identify a different offer.
-            if area.h<42.0*l.k {
-                titles.push((format!("hand{i}.title"),sample(&heading,&Rect::new(0.0,0.0,heading.width as f64,heading.height as f64),false)));
+            let anchor=reference.and_then(|r|r.anchors.get(i).copied().flatten()).or_else(|| {
+                let (_,area)=crate::titles::located_heading(img,c,l.k,false);
+                (area.h<42.0*l.k).then(||Rect::new(area.x,area.y-4.0*l.k,area.w,area.h+36.0*l.k))
+            });
+            // Freeze a readable title plus its wrapped species line. Re-centering a crop on every
+            // poll made an unchanged heading jump between rows as card lighting pulsed.
+            if let Some(area)=anchor {
+                let ink=crate::titles::text_ink(&crate::pixels::crop(img,area));
+                titles.push((format!("hand{i}.title"),sample(&ink,&Rect::new(0.0,0.0,ink.width as f64,ink.height as f64),false)));
             }
-            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, moving);
+            add(format!("hand{i}.art"), Rect::new(c.cx-38.0*l.k,c.cy-145.0*l.k,76.0*l.k,100.0*l.k), false, moving||anchor.is_some());
+            anchors.push(anchor);
         }
         for (i, r) in l.instrument_icon.iter().enumerate() { add(format!("instrument{i}"), *r, false, false); }
-        // Compare the text itself, rather than the red card's pulsing background or an adjacent
-        // description line. All three moving headings use the same per-frame locator as OCR.
+        // Compare foreground text at the accepted coordinates. The card's smooth lighting and
+        // artwork do not invalidate an otherwise unchanged offer.
         for (name,values) in titles {if let Some(area)=areas.iter_mut().find(|a|a.name==name) {area.values=values;}}
         let count=crate::cards::cards_present(img,&l);
-        let present=if count<3 && tooltip.is_some() {3} else {count};
+        // Readable anchored text proves the occupied offer positions more reliably than animated
+        // card backgrounds. A played/disappearing card still changes its anchored text pixels.
+        let present=if anchors.iter().all(Option::is_some) {size} else if count<3 && tooltip.is_some() {3} else {count};
         let g=gray(img);
         let tanks=(0..6).map(|i| {
             let r=crate::adaptive::tank(img,&g,&l,i,crate::scan_data());
@@ -54,7 +63,7 @@ impl Stamp {
                 && r.fields.get(&format!("tank{i}.quantity")).is_some_and(|f|f.sure))
                 .and_then(|m|serde_json::to_string(&m).ok())
         }).collect();
-        Self { size:(img.width,img.height),ui,present,tooltip:moving,areas,tanks }
+        Self { size:(img.width,img.height),ui,present,tooltip:moving,areas,tanks,hand_size:size,anchors }
     }
     fn differences(&self, other: &Self) -> Vec<Difference> {
         if self.size != other.size || self.ui != other.ui || self.areas.len()!=other.areas.len() {
@@ -113,7 +122,7 @@ pub struct ScreenWatch { accepted:Option<Stamp>, pending:Option<(Stamp,f64)>, ho
 impl ScreenWatch {
     pub fn set_hover(&mut self, slot:Option<usize>) { self.hovered=slot; }
     pub fn observe(&mut self,img:&Img,ui:f64,now_ms:f64)->Change {
-        let stamp=Stamp::new(img,ui,self.hovered);
+        let stamp=Stamp::new(img,ui,self.hovered,self.accepted.as_ref(),self.had_hover && self.hovered.is_none());
         let leaving=self.had_hover && !stamp.tooltip;self.had_hover=stamp.tooltip;
         if let Some(old)=&mut self.accepted {
             // Leaving the popup restores the entire fan. Rebase only those pixels, once, so the
@@ -123,6 +132,7 @@ impl ScreenWatch {
                     if let Some(now)=stamp.areas.iter().find(|a|a.name==area.name) {*area=now.clone();}
                 }}
                 old.tooltip=false;
+                old.anchors=stamp.anchors.clone();old.present=stamp.present;old.hand_size=stamp.hand_size;
             }
         }
         if let Some((before,since))=&mut self.pending {
@@ -134,7 +144,7 @@ impl ScreenWatch {
         if diff.is_empty() {Change::Unchanged} else {self.last_difference=diff;self.pending=Some((stamp,now_ms));Change::Changed}
     }
     pub fn accept(&mut self,img:&Img,ui:f64) {
-        let mut stamp=Stamp::new(img,ui,self.hovered);
+        let mut stamp=Stamp::new(img,ui,self.hovered,None,true);
         self.had_hover=stamp.tooltip;
         if let Some(old)=&self.accepted {
             for a in &mut stamp.areas { if a.ignored { if let Some(b)=old.areas.iter().find(|b|b.name==a.name) {a.values=b.values.clone();} } }
@@ -143,7 +153,7 @@ impl ScreenWatch {
         self.accepted=Some(stamp); self.pending=None;
     }
     pub fn compare(&self,img:&Img,ui:f64)->Vec<Difference> {
-        self.accepted.as_ref().map_or_else(||vec![Difference {area:"no-reference".into(),similarity:0.0,mean_delta:255.0,before:None,after:None}],|s|s.differences(&Stamp::new(img,ui,self.hovered)))
+        self.accepted.as_ref().map_or_else(||vec![Difference {area:"no-reference".into(),similarity:0.0,mean_delta:255.0,before:None,after:None}],|s|s.differences(&Stamp::new(img,ui,self.hovered,Some(s),false)))
     }
     pub fn differs(&self,img:&Img,ui:f64)->bool { !self.compare(img,ui).is_empty() }
     pub fn reset(&mut self)->bool {let had=self.accepted.is_some()||self.pending.is_some();*self=Self::default();had}

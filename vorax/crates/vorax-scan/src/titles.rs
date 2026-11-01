@@ -84,7 +84,9 @@ pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f6
         let crop = title_crop(img, &at, k);
         let value = signature(&crop, Rect::new(30.0, 160.0, 500.0, 96.0), 64, 16);
         for (name, samples) in refs {
-            let score = samples.iter().map(|v| dot(v, &value)).fold(f64::NEG_INFINITY, f64::max);
+            let score = samples.iter().filter(|v|!crate::family::is_variant(name)
+                || (region_correlation(v,&value,40,64,0,16)>=0.90 && region_correlation(v,&value,0,64,8,16)>=0.90))
+                .map(|v| dot(v, &value)).fold(f64::NEG_INFINITY, f64::max);
             let old = scores.entry(name).or_insert(f64::NEG_INFINITY);
             *old = old.max(score);
         }
@@ -96,6 +98,13 @@ pub fn localized_title(img: &Img, c: &CardPos, k: f64, candidates: &[(String, f6
     (*score >= 0.94 && *score - second >= 0.06
         && candidates.iter().any(|(n, s)| n == *name && *s >= ART_SUPPORT))
         .then(|| ((*name).clone(), *score))
+}
+
+fn region_correlation(a:&[f64],b:&[f64],x0:usize,x1:usize,y0:usize,y1:usize)->f64 {
+    let (mut sa,mut sb,mut aa,mut bb,mut ab,mut n)=(0.0,0.0,0.0,0.0,0.0,0.0);
+    for y in y0..y1 {for x in x0..x1 {let (a,b)=(a[y*64+x],b[y*64+x]);sa+=a;sb+=b;aa+=a*a;bb+=b*b;ab+=a*b;n+=1.0;}}
+    let norm=((aa-sa*sa/n).max(0.0)*(bb-sb*sb/n).max(0.0)).sqrt();
+    if norm>1e-12 {(ab-sa*sb/n)/norm} else {0.0}
 }
 
 const ART_SUPPORT: f64 = 0.92;
@@ -144,6 +153,23 @@ fn ink_threshold(p:&[u8])->u8 {
         let delta=sum/count-(total-sum)/rest;let score=count*rest*delta*delta;
         if score>best {best=score;at=i;}
     }(at as f64*0.7).max(8.0) as u8
+}
+
+/// Foreground strokes on a fixed text region. The watcher reuses the same coordinates, so
+/// pulse animation cannot move the normalization box from a heading to its description.
+pub fn text_ink(p:&Img)->Img {
+    let (w,h)=(p.width,p.height);let gray:Vec<u8>=p.data.chunks_exact(4).map(|v|v[0].min(v[1])).collect();
+    let opened=filter_line(&filter_line(&filter_line(&filter_line(&gray,w,h,true,false),w,h,false,false),w,h,true,true),w,h,false,true);
+    let lift:Vec<u8>=gray.iter().zip(opened).map(|(v,b)|v.saturating_sub(b)).collect();let threshold=ink_threshold(&lift);
+    let mut ranked=lift.clone();ranked.sort_unstable();let high=ranked[ranked.len()*95/100].max(16) as f64;
+    let mut out=Img::new(w,h);
+    for (i,v) in lift.iter().enumerate() {let pixel=if (*v as f64)<threshold as f64*0.5 {255} else {clamp_u8(255.0-*v as f64*400.0/high)};out.data[i*4..i*4+4].copy_from_slice(&[pixel,pixel,pixel,255]);}
+    out
+}
+
+/// Keep the wrapped title and first description lines, where the species noun is printed.
+pub fn family_crop(img:&Img,c:&CardPos,k:f64)->Img {
+    text_ink(&patch(img,c.cx,c.cy,c.angle,Rect::new(-216.0,-96.0,432.0,320.0),k/2.0))
 }
 
 /// Locate a text row on each captured frame. Hover raises a card and slides its neighbours, so the
@@ -273,6 +299,14 @@ fn settled(r: &[(String, f64)]) -> bool {
     r[0].1 >= MIN_Q && r[0].1 - r.get(1).map_or(f64::NEG_INFINITY, |x| x.1) >= GAP
 }
 
+fn title_ranks(data:&ScanData,phase:&str,text:&str,localized:bool)->Vec<(String,f64)> {
+    let mut r=ranked(data,phase,text);if localized {crate::family::rerank(&mut r,text,names_for(data,phase));}r
+}
+fn title_settled(data:&ScanData,phase:&str,text:&str,localized:bool)->bool {
+    let r=title_ranks(data,phase,text,localized);
+    settled(&r) && (!localized || crate::family::verified(&r[0].0,text,names_for(data,phase)))
+}
+
 /// Some of a hand's cards matched by their pictures: per position, the best few cards, its field, and whether
 /// no picture was close enough.
 #[derive(Clone, Debug)]
@@ -363,31 +397,35 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
                 return crate::korean::name(name).to_string();
             }
             let heading = read_text(&heading_crop(img, c, l.k));
-            if phases.iter().any(|phase| settled(&ranked(data, phase, &heading))) { return heading; }
+            if phases.iter().any(|phase| title_settled(data,phase,&heading,gold_first)) { return heading; }
+            if phases.iter().any(|phase|ranked(data,phase,&heading).first().is_some_and(|r|crate::family::is_variant(&r.0) && r.1>=MIN_Q)) {
+                let block=read_text(&family_crop(img,c,l.k));let joined=format!("{heading}\n{block}");
+                if phases.iter().any(|phase|title_settled(data,phase,&joined,true)) {return joined;}
+            }
         }
         let text = read_text(&if gold_first { title_crop_gold(img, c, l.k, 70) } else { title_crop(img, c, l.k) });
-        if (gold_first || text.chars().any(crate::korean::hangul)) && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
+        if (gold_first || text.chars().any(crate::korean::hangul)) && !phases.iter().any(|phase| title_settled(data,phase,&text,gold_first)) {
             let other = read_text(&if gold_first { title_crop(img, c, l.k) } else { title_crop_gold(img, c, l.k, 70) });
-            if phases.iter().any(|phase| settled(&ranked(data, phase, &other))) { return other; }
+            if phases.iter().any(|phase| title_settled(data,phase,&other,gold_first)) { return other; }
         }
         if std::env::var("VORAX_OCR_MODE").is_ok_and(|v| v == "accurate")
-            && !phases.iter().any(|phase| settled(&ranked(data, phase, &text))) {
+            && !phases.iter().any(|phase| title_settled(data,phase,&text,gold_first)) {
             let crop = title_crop(img, c, l.k);
             for scale in [1.5, 2.0] {
                 let enlarged = resize(&crop, (crop.width as f64 * scale) as usize, (crop.height as f64 * scale) as usize);
                 let candidate = read_text(&enlarged);
-                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+                if phases.iter().any(|phase| title_settled(data,phase,&candidate,gold_first)) { return candidate; }
             }
             for threshold in [50, 90] {
                 let candidate = read_text(&title_crop_gold(img, c, l.k, threshold));
-                if phases.iter().any(|phase| settled(&ranked(data, phase, &candidate))) { return candidate; }
+                if phases.iter().any(|phase| title_settled(data,phase,&candidate,gold_first)) { return candidate; }
             }
         }
         text
     }).collect();
     let mut best: Option<(&str, Vec<Vec<(String, f64)>>, f64)> = None;
     for phase in phases {
-        let slots: Vec<Vec<(String, f64)>> = texts.iter().map(|t| ranked(data, phase, t)).collect();
+        let slots: Vec<Vec<(String, f64)>> = texts.iter().map(|t| title_ranks(data,phase,t,gold_first)).collect();
         let fit = slots.iter().fold(0.0, |s, r| s + r[0].1.max(0.0));
         if best.as_ref().is_none_or(|b| fit > b.2) {
             best = Some((phase, slots, fit));
@@ -397,7 +435,8 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
     let pos = l.hand_at(size);
 
     let extensions:Vec<_>=slots.iter().enumerate().map(|(j,r)|if gold_first && !known.contains_key(&j) && settled(r) && damaged_leading_modifier(&r[0].0,&texts[j]) {extended_names(data,phase,&r[0].0)} else {vec![]}).collect();
-    let need: Vec<usize> = slots.iter().enumerate().filter(|(j, r)| !settled(r) || !extensions[*j].is_empty()).map(|(j, _)| j).collect();
+    let need: Vec<usize> = slots.iter().enumerate().filter(|(j, r)| !settled(r) || !extensions[*j].is_empty()
+        || (gold_first && !crate::family::verified(&r[0].0,&texts[*j],names_for(data,phase)))).map(|(j, _)| j).collect();
     let from_reading = read == size && phase == header;
     let pics: HashMap<usize, PictureRead> = if from_reading {
         need.iter()
@@ -425,24 +464,28 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
             let base=p.ranks.iter().find(|(n,_)|n==&top.0).map_or(0.0,|(_,s)|*s);
             p.ranks.iter().any(|(n,s)|extensions[j].contains(n) && *s>=ART_SUPPORT && *s>=base-0.04)
         });
-        if prefix_missing {
-            fields.insert(key,FieldRead{sure:false,guess:Some(top.0.clone()),score:Some(top.1),second:second.map(|s|s.1)});
+        let species_missing=gold_first && crate::family::is_variant(&top.0) && !crate::family::verified(&top.0,&texts[j],names_for(data,phase));
+        if prefix_missing || species_missing {
+            fields.insert(key.clone(),FieldRead{sure:false,guess:Some(top.0.clone()),score:Some(top.1),second:second.map(|s|s.1)});
             unknown.push(j);continue;
         }
         if settled(r) {
             name = Some(top.0.clone());
-            fields.insert(key, FieldRead { sure: true, guess: name.clone(), score: Some(top.1), second: second.map(|s| s.1) });
+            fields.insert(key.clone(), FieldRead { sure: true, guess: name.clone(), score: Some(top.1), second: second.map(|s| s.1) });
         } else if top.1 >= MIN_Q {
             let close: Vec<&String> = r.iter().filter(|(_, q)| *q >= top.1 - GAP).map(|(n, _)| n).collect();
             let n = pic.and_then(|p| p.ranks.iter().find(|(n, _)| close.contains(&n)).map(|x| x.0.clone())).unwrap_or_else(|| top.0.clone());
             let sure = pic.is_some_and(|p| p.ranks.first().is_some_and(|x| x.0 == n) && p.field.as_ref().is_some_and(|f| f.sure));
-            fields.insert(key, FieldRead { sure, guess: Some(n.clone()), score: Some(top.1), second: second.map(|s| s.1) });
+            fields.insert(key.clone(), FieldRead { sure, guess: Some(n.clone()), score: Some(top.1), second: second.map(|s| s.1) });
             name = Some(n);
         } else if let Some(p) = pic.filter(|p| !p.unknown && p.field.as_ref().is_some_and(|f| f.guess.is_some())) {
             name = p.field.as_ref().unwrap().guess.clone();
-            fields.insert(key, p.field.clone().unwrap());
+            fields.insert(key.clone(), p.field.clone().unwrap());
         } else {
-            fields.insert(key, pic.and_then(|p| p.field.clone()).unwrap_or(FieldRead::sure(false)));
+            fields.insert(key.clone(), pic.and_then(|p| p.field.clone()).unwrap_or(FieldRead::sure(false)));
+        }
+        if gold_first && name.as_ref().is_some_and(|n|!crate::family::verified(n,&texts[j],names_for(data,phase))) {
+            if let Some(field)=fields.get_mut(&key) {field.sure=false;}name=None;
         }
         match name {
             Some(n) => hand.push(n),
