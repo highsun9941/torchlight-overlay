@@ -406,6 +406,73 @@ mod tests {
         let frame=super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/variant-motion").join(file)).unwrap();
         super::windowed_game(&frame).map_or_else(||frame.clone(),|r|super::crop_to(&frame,&r))
     }
+    fn gold_saw(file:&str)->super::Img {
+        super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/gold-saw").join(file)).unwrap()
+    }
+    #[test]
+    fn a_gold_tooltip_uses_all_four_edges_and_preserves_the_short_title() {
+        use super::*;
+        use vorax_scan::hover::{inspect_tooltip,recognize};
+        for frame in [gold_saw("tooltip.png"),vorax_scan::pixels::resize(&gold_saw("tooltip.png"),2055,881)] {
+            let search=inspect_tooltip(&frame);let tip=search.tooltip.as_ref().unwrap_or_else(||panic!("the visible gold tooltip must be found at {}x{}: {search:?}",frame.width,frame.height));
+            assert_eq!(search.method,Some("gold_edges"));
+            assert!((36.0..46.0).contains(&tip.rect.x) && (202.0..216.0).contains(&tip.rect.w),"the saw/glow must not change the card bounds: {search:?}");
+            let c=vorax_scan::layout::CardPos{cx:tip.center.x,cy:tip.center.y,angle:0.0};
+            let (crop,area)=vorax_scan::titles::gold_heading(&frame,&c,tip.scale,true);
+            assert!((518.0..538.0).contains(&area.y) && area.w>55.0 && area.w<90.0,"the four syllables must stay together: {area:?}");
+            if std::env::var_os("VORAX_QA_CROPS").is_some() {
+                let path=std::env::temp_dir().join("gold-saw-title.png");encode_png(&path,crop.width as u32,crop.height as u32,&crop.data).unwrap();
+                let hex=std::fs::read(path).unwrap().iter().map(|b|format!("{b:02x}")).collect::<String>();println!("QA_GOLD heading {} {hex}",frame.width);
+            }
+            let source=vec![("Pig Iron Bone Saw".to_string(),0.994)];let mut text=|_:&Img|"무쇠뼈롭".to_string();
+            let read=recognize(&frame,"instrument",&source,&mut text).unwrap();
+            assert_eq!(read.name,"Pig Iron Bone Saw");assert_eq!(read.match_kind,"short_title_and_source_art");assert!(read.art_score>=0.95);
+        }
+        for file in ["raised.png","rest.png"] {assert!(inspect_tooltip(&gold_saw(file)).tooltip.is_none(),"a raised hand card is not a left tooltip: {file}");}
+    }
+    #[test]
+    fn recorded_short_title_damage_recovers_only_with_source_and_popup_art() {
+        use super::*;
+        let frame=gold_saw("tooltip.png");let record:serde_json::Value=serde_json::from_str(include_str!("../../../fixtures/gold-saw/ocr.json")).unwrap();
+        let source=vec![("Pig Iron Bone Saw".to_string(),0.994)];let mut recovered=0;
+        for attempt in record["hover"].as_array().unwrap() {
+            let heading=attempt[0].as_str().unwrap();
+            if !["무쇠뼈롭","무쇠 뼈를"].contains(&heading) {continue;}
+            let mut next=0;let mut text=|_:&Img| {let out=attempt[next.min(2)].as_str().unwrap().to_string();next+=1;out};
+            let read=vorax_scan::hover::recognize(&frame,"instrument",&source,&mut text).unwrap();
+            assert_eq!(read.name,"Pig Iron Bone Saw");recovered+=1;
+        }
+        assert_eq!(recovered,6,"exercise the six actual near-complete headings in the log");
+        for heading in ["무쇠","무쇄뼈롭","무쇄떠롭","라운드 종료 시 수량과 활성이 모두"] {
+            let mut text=|_:&Img|heading.to_string();assert!(vorax_scan::hover::recognize(&frame,"instrument",&source,&mut text).is_err(),"{heading}");
+        }
+        for source in [vec![],vec![("Rawhide Restraint".to_string(),0.99)],vec![("Pig Iron Bone Saw".to_string(),0.89)]] {
+            let mut text=|_:&Img|"무쇠뼈롭".to_string();assert!(vorax_scan::hover::recognize(&frame,"instrument",&source,&mut text).is_err(),"missing or contradictory original art cannot confirm the name");
+        }
+    }
+    #[test]
+    fn the_reported_gold_saw_offer_reaches_advice_and_keeps_confirmed_fields() {
+        use super::*;
+        if !production_korean_case("the_reported_gold_saw_offer_reaches_advice_and_keeps_confirmed_fields") {return;}
+        let record:serde_json::Value=serde_json::from_str(include_str!("../../../fixtures/gold-saw/ocr.json")).unwrap();
+        let mut next=0;let mut text=|_:&Img| {let out=record["initial"][next]["text"].as_str().expect("exact initial OCR replay").to_string();next+=1;out};
+        let mut pipe=Pipeline::new(0);
+        match pipe.run(&gold_saw("raised.png"),None,Some(&mut text)) {
+            Outcome::Uncertain{reading}=>{assert_eq!(reading.state.round,Some(1));assert!(reading.fields["hand1"].sure && reading.fields["hand2"].sure);},
+            _=>panic!("the recorded clipped name must request only the saw"),
+        }
+        assert_eq!(pipe.requested_slots(),[0]);let candidates=pipe.hover_candidates();
+        let mut text=|_:&Img|"무쇠뼈롭".to_string();
+        let read=vorax_scan::hover::recognize(&gold_saw("tooltip.png"),"instrument",&candidates[0].1,&mut text).unwrap();
+        assert_eq!(vorax_scan::hover::target(&read.name,&candidates,None),Some(0));
+        assert!(!pipe.confirm_hover(0,&read,500.0));assert!(pipe.confirm_hover(0,&read,1000.0));
+        let mut no_repeat=|_:&Img|->String{panic!("the round, tanks and other two cards are already confirmed")};
+        match pipe.run(&gold_saw("rest.png"),None,Some(&mut no_repeat)) {
+            Outcome::Advice{reading,..}=>assert_eq!(reading.state.hand,["Pig Iron Bone Saw","Sinew Garrote","Vermicular Spinal Cord"]),
+            Outcome::Uncertain{reading}=>panic!("completed saw confirmation must reach advice: {}",serde_json::to_string(&reading).unwrap()),
+            _=>panic!("expected advice after confirming the saw"),
+        }
+    }
     fn species_replay(body:bool)->impl FnMut(&super::Img)->String {
         let mut slot=0;
         move |img:&super::Img| {

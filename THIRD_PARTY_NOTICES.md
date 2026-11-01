@@ -34,3 +34,5 @@ Additional modifications in 1.2.1: verified tank-state change detection, glyph-r
 1.2.5 fork modifications add original-capture refresh counter recovery, explicit read-only failure feedback and locations, and damaged-leading-modifier checks. No runtime dependencies are added.
 
 1.2.6 fork modifications add species-variant evidence checks, wrapped title/description OCR, regional title-template checks, and anchored foreground-text change detection. No runtime dependencies are added.
+
+1.2.7 fork modifications add four-edge gold tooltip fitting, blue-channel instrument headings, and catalog-unique short-title recovery supported by source and popup art. No runtime dependencies are added.
