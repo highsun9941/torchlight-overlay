@@ -81,7 +81,9 @@ fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
         mask[y*w+x]=match color {
             BorderColor::Neutral=>r.min(g).min(b)>=60 && r.max(g).max(b)-r.min(g).min(b)<=48,
             BorderColor::Blue=>b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
-            BorderColor::Gold=>r>145 && g>80 && b<150 && r as f64>g as f64*1.1,
+            // Scaling blends the thin rim with its dark neighbours. Keep its warm hue and
+            // require four independent edges instead of relying on a high absolute brightness.
+            BorderColor::Gold=>r>130 && g>70 && b<155 && r as i32-g as i32>=25 && g as i32-b as i32>=15,
         };
     }}
     let on=|x:usize,y:usize|(x.saturating_sub(1)..=(x+1).min(w-1)).any(|xx|mask[y*w+xx]);

@@ -414,7 +414,7 @@ mod tests {
         use super::*;
         use vorax_scan::hover::{inspect_tooltip,recognize};
         for frame in [gold_saw("tooltip.png"),vorax_scan::pixels::resize(&gold_saw("tooltip.png"),2055,881)] {
-            let search=inspect_tooltip(&frame);let tip=search.tooltip.as_ref().expect("the visible gold tooltip must be found");
+            let search=inspect_tooltip(&frame);let tip=search.tooltip.as_ref().unwrap_or_else(||panic!("the visible gold tooltip must be found at {}x{}: {search:?}",frame.width,frame.height));
             assert_eq!(search.method,Some("gold_edges"));
             assert!((36.0..46.0).contains(&tip.rect.x) && (202.0..216.0).contains(&tip.rect.w),"the saw/glow must not change the card bounds: {search:?}");
             let c=vorax_scan::layout::CardPos{cx:tip.center.x,cy:tip.center.y,angle:0.0};
