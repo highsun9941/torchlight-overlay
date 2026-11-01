@@ -56,11 +56,11 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
     let ocr = if opts.ocr {
         match Ocr::new() {
             Ok(o) => {
-                note(&format!("card titles read with Windows OCR ({})", o.language));
+                note(&format!("card titles read with {} ({}): {}", o.backend,o.language,o.details()));
                 Some(o)
             }
             Err(e) => {
-                note(&format!("no Windows OCR ({e}): cards read by their pictures"));
+                note(&format!("OCR startup failed ({e}): cards read by their pictures"));
                 None
             }
         }

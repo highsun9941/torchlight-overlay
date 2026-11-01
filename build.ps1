@@ -26,6 +26,8 @@ if (!$SkipNative) {
 }
 & dotnet publish (Join-Path $taskRoot 'tartarus/src/Tartarus.App/Tartarus.App.csproj') -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:SentryDsn= -o $out
 if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed.' }
+& dotnet publish (Join-Path $taskRoot 'tartarus/tools/Vorax.OcrHost/Vorax.OcrHost.csproj') -c Release -p:Platform=x64 -r win-x64 --self-contained true -o $out
+if ($LASTEXITCODE -ne 0) { throw 'CPU OCR worker publish failed.' }
 Copy-Item -Path (Join-Path $taskRoot 'tartarus/models') -Destination $out -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'vorax/target/release/vorax-overlay.exe') -Destination $out -Force
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.ko.md') -Destination (Join-Path $out 'README.ko.md') -Force

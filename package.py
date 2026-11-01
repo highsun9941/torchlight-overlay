@@ -6,14 +6,14 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / 'release' / 'TorchlightHelper-KO'
-ARCHIVE = ROOT / 'release' / 'TorchlightHelper-KO-1.2.7-win-x64.zip'
+ARCHIVE = ROOT / 'release' / 'TorchlightHelper-KO-1.2.8-ocr.1-win-x64.zip'
 BLOCKED = {'user-data', 'dataset', 'reports', 'qa'}
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def main():
-    for name in ['TorchlightHelper.exe', 'vorax-overlay.exe', 'README.ko.md', 'THIRD_PARTY_NOTICES.md', 'models/ocr/rec_korean.onnx']:
+    for name in ['TorchlightHelper.exe', 'vorax-overlay.exe', 'README.ko.md', 'THIRD_PARTY_NOTICES.md', 'models/ocr/rec_korean.onnx', 'models/ocr/dict_korean.txt', 'Vorax.OcrHost.exe', 'Vorax.OcrHost.dll']:
         if not (BUILD/name).is_file():
             raise SystemExit(f'Missing build artifact: {name}')
     dependencies = BUILD/'licenses/dependencies'
