@@ -32,4 +32,23 @@ public sealed class VoraxOcrTests
         var frame = Canvas(); Fill(frame, 70, 15, 270, 135);
         Assert.Empty(VoraxTextReader.TextRows(frame));
     }
+    [Fact]
+    public void RecordedBoldActivityDigitReachesTheActualCpuRecognizer()
+    {
+        var frame = ImageIO.Load(Path.Combine(AppContext.BaseDirectory, "fixtures", "tank-activity.png"));
+        var box = Assert.Single(VoraxTextReader.TextRows(frame));
+        Assert.InRange(box.X0, 88, 96); Assert.InRange(box.X1, 124, 133);
+        Assert.InRange(box.Y0, 17, 24); Assert.InRange(box.Y1, 69, 77);
+        using var reader = new VoraxTextReader(threads: 1);
+        Assert.Equal("5", reader.Read(frame).Text);
+    }
+    [Fact]
+    public void SolidNarrowAndWideBlocksRemainRejected()
+    {
+        foreach (var (w,h) in new[] { (32,50), (180,70) })
+        {
+            var frame = Canvas(); Fill(frame, 110, 25, w, h);
+            Assert.Empty(VoraxTextReader.TextRows(frame));
+        }
+    }
 }

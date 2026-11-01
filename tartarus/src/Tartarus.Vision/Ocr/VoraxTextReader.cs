@@ -93,7 +93,12 @@ public sealed class VoraxTextReader : IDisposable
                 if (count < 2) continue;
                 left = Math.Min(left, x); right = x; pixels += count;
             }
-            if (right < left || right - left < 3 || pixels > (right - left + 1) * (bottom - top) * 0.8) continue;
+            if (right < left || right - left < 3) continue;
+            // A bold, isolated digit can fill slightly over 80% of its tight bounds (the
+            // reported activity '5' fills 80.58%). Keep it; solid artwork still fails the
+            // density check, and wide text retains the stricter original threshold.
+            double densityLimit = right - left + 1 <= (bottom - top) * 1.5 ? 0.92 : 0.8;
+            if (pixels > (right - left + 1) * (bottom - top) * densityLimit) continue;
             int pad = Math.Max(2, (bottom - top) / 12);
             boxes.Add(new PixelBox(left - pad, top - pad, right + 1 + pad, bottom + pad).Clamp(w, h));
             if (boxes.Count == 12) break;
