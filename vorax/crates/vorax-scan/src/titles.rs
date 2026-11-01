@@ -176,9 +176,18 @@ pub fn family_crop(img:&Img,c:&CardPos,k:f64)->Img {
 /// old fixed heading can land on a description. Opening removes the smooth background without
 /// subtracting the dense middle strokes of Hangul as the old local mean did.
 pub fn located_heading(img:&Img,c:&CardPos,k:f64,enlarged:bool)->(Img,Rect) {
+    heading_with_channel(img,c,k,enlarged,false)
+}
+
+/// Gold instrument text has blue-channel contrast against the warm card background.
+pub fn gold_heading(img:&Img,c:&CardPos,k:f64,enlarged:bool)->(Img,Rect) {
+    heading_with_channel(img,c,k,enlarged,true)
+}
+
+fn heading_with_channel(img:&Img,c:&CardPos,k:f64,enlarged:bool,gold:bool)->(Img,Rect) {
     let r=if enlarged{Rect::new(-216.0,-100.0,432.0,88.0)}else{Rect::new(-320.0,-210.0,640.0,340.0)};
     let p=patch(img,c.cx,c.cy,c.angle,r,k/2.0);let (w,h)=(p.width,p.height);
-    let gray:Vec<u8>=p.data.chunks_exact(4).map(|v|v[0].min(v[1])).collect();
+    let gray:Vec<u8>=p.data.chunks_exact(4).map(|v|if gold {v[2]} else {v[0].min(v[1])}).collect();
     let opened=filter_line(&filter_line(&filter_line(&filter_line(&gray,w,h,true,false),w,h,false,false),w,h,true,true),w,h,false,true);
     let lift:Vec<u8>=gray.iter().zip(opened).map(|(v,b)|v.saturating_sub(b)).collect();
     let threshold=ink_threshold(&lift);
@@ -396,7 +405,7 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
                 .and_then(|f| f.guess.as_deref()) {
                 return crate::korean::name(name).to_string();
             }
-            let heading = read_text(&heading_crop(img, c, l.k));
+            let heading = read_text(&if header=="instrument" {gold_heading(img,c,l.k,false).0} else {heading_crop(img,c,l.k)});
             if phases.iter().any(|phase| title_settled(data,phase,&heading,gold_first)) { return heading; }
             if phases.iter().any(|phase|ranked(data,phase,&heading).first().is_some_and(|r|crate::family::is_variant(&r.0) && r.1>=MIN_Q)) {
                 let block=read_text(&family_crop(img,c,l.k));let joined=format!("{heading}\n{block}");
