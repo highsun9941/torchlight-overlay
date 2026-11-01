@@ -5,7 +5,7 @@ using Tartarus.Vision;
 using Tartarus.Vision.Ocr;
 
 string? Opt(string name) { int at = Array.IndexOf(args, name); return at >= 0 && at + 1 < args.Length ? args[at + 1] : null; }
-int threads = int.TryParse(Opt("--threads"), out var n) ? n : 2;
+int threads = int.TryParse(Opt("--threads"), out var n) ? n : 1;
 Stream input = Console.OpenStandardInput(), output = Console.OpenStandardOutput();
 void Reply(object value)
 {

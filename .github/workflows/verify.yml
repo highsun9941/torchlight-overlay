@@ -90,7 +90,7 @@ jobs:
           VORAX_LANGUAGE: ko
           VORAX_OCR_MODE: accurate
           VORAX_OCR_BACKEND: paddle
-          VORAX_OCR_THREADS: 2
+          VORAX_OCR_THREADS: 1
         shell: pwsh
         run: |
           $out = Join-Path $env:RUNNER_TEMP 'paddle-ocr-validation'
@@ -141,7 +141,9 @@ jobs:
           New-Item -ItemType Directory -Force $data | Out-Null
           '{"VoraxCpuMode":3,"ShelleyLevel":0,"SettingsVersion":2}' | Set-Content "$data/settings.json"
           $preview = Join-Path $env:RUNNER_TEMP 'helper-ui'
-          $process = Start-Process ./release/TorchlightHelper-KO/TorchlightHelper.exe -ArgumentList "--preview-ui $preview" -Wait -PassThru
+          $process = Start-Process ./release/TorchlightHelper-KO/TorchlightHelper.exe -ArgumentList "--preview-ui $preview" -PassThru
+          if (!$process.WaitForExit(60000)) { Stop-Process -Id $process.Id -Force; throw 'Helper UI preview timed out' }
+          if (Test-Path "$preview/preview-error.txt") { Write-Host (Get-Content "$preview/preview-error.txt" -Raw) }
           if ($process.ExitCode -ne 0 -or !(Test-Path "$preview/vorax-ui.png")) { throw 'Helper UI preview failed' }
       - name: Package and verify file hashes
         run: python package.py

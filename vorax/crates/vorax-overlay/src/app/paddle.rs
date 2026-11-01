@@ -21,7 +21,7 @@ impl Paddle {
             .or_else(||std::env::current_exe().ok().and_then(|p|p.parent().map(|p|p.join("Vorax.OcrHost.exe"))))
             .ok_or("cannot locate the bundled OCR worker")?;
         if !exe.is_file() {return Err("Vorax.OcrHost.exe is missing; extract the complete OCR preview ZIP".into());}
-        let threads = std::env::var("VORAX_OCR_THREADS").ok().and_then(|s|s.parse::<u32>().ok()).unwrap_or(2).clamp(1,4);
+        let threads = std::env::var("VORAX_OCR_THREADS").ok().and_then(|s|s.parse::<u32>().ok()).unwrap_or(1).clamp(1,4);
         let mut child=Command::new(&exe).args(["--serve","--threads",&threads.to_string()])
             .current_dir(exe.parent().ok_or("OCR worker has no directory")?)
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())

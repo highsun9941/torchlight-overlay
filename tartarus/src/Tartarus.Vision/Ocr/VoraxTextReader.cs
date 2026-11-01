@@ -14,7 +14,7 @@ public sealed class VoraxTextReader : IDisposable
     public int Height => _recognizer.Height;
     public string ModelSha256 { get; }
 
-    public VoraxTextReader(string? modelDir = null, int threads = 2)
+    public VoraxTextReader(string? modelDir = null, int threads = 1)
     {
         modelDir ??= OcrEngine.FindModelDir();
         var pack = OcrPacks.Korean;
