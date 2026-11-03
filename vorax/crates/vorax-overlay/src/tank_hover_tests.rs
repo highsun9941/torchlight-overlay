@@ -118,6 +118,12 @@ fn rare_tank_confirmation_advances_to_the_unresolved_card_without_guessing_it() 
     assert!(pipe.requested_tanks().is_empty());assert_eq!(pipe.requested_slots(),[0]);
     let pending=pipe.pending().unwrap();assert_eq!(pending.state.hand,r.state.hand);assert!(!trustworthy(pending));
     assert!(pending.fields["tank0.activity"].sure && pending.fields["tank0.quantity"].sure && !pending.fields["hand0"].sure);
+    assert_eq!(tank_hover::target(&read,pending,None),Some(0),"a confirmed source does not need a bitmap score");
+    let mut duplicate=pending.clone();duplicate.state.tanks[1]=duplicate.state.tanks[0].clone();
+    let debug=duplicate.debug.as_ref().unwrap().tanks[0].clone();duplicate.debug.as_mut().unwrap().tanks[1]=debug;
+    for part in ["rarity","archetype","activity","quantity"] {duplicate.fields.insert(format!("tank1.{part}"),duplicate.fields[&format!("tank0.{part}")].clone());}
+    assert_eq!(tank_hover::target(&read,&duplicate,None),None,"confirmed sources still participate in ambiguity checks");
+    assert_eq!(tank_hover::target(&read,&duplicate,Some(1)),Some(1));
     let feedback=crate::feedback::for_reading(pending,&pipe.requested_slots());
     assert!(!feedback.title.contains("탱크"));assert!(feedback.title.contains("1번 카드"));assert_eq!(feedback.plan.inspect.len(),1);
     let mut noisy=rare_recorded();pipe.apply_zoom(&mut noisy);assert_eq!(pipe.requested_slots(),[0]);assert!(pipe.requested_tanks().is_empty());

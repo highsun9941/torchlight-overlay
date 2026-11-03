@@ -126,6 +126,11 @@ pub fn inspect_target(read: &TankHoverRead, r: &Reading, pointer: Option<usize>)
             if let Some(total)=debug.and_then(|d|positive_number(&d.total)) {
                 return if total==read.total {"matched_total"} else {"total_mismatch"};
             }
+            // Previously confirmed factors remain source evidence after their original
+            // bitmap score has been replaced by a validated hover observation.
+            if sure("activity") && sure("quantity") && m.activity.checked_mul(m.quantity)==Some(read.total) {
+                return "matched_verified_pair";
+            }
             // Missing total is precisely why the original reader withheld both factors.
             // An independently read, complete, high-scoring compact A×Q line can still
             // identify this tank; never use fallback state values or divide the total.
@@ -137,7 +142,7 @@ pub fn inspect_target(read: &TankHoverRead, r: &Reading, pointer: Option<usize>)
         })();
         (i,reason)
     }).collect();
-    let matching: Vec<_>=candidates.iter().filter(|(_,why)|matches!(*why,"matched_total"|"matched_activity_quantity")).map(|(i,_)|*i).collect();
+    let matching: Vec<_>=candidates.iter().filter(|(_,why)|matches!(*why,"matched_total"|"matched_activity_quantity"|"matched_verified_pair")).map(|(i,_)|*i).collect();
     let slot=if let Some(i)=pointer {matching.contains(&i).then_some(i)} else {(matching.len()==1).then(||matching[0])};
     Association{slot,candidates}
 }
