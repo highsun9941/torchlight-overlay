@@ -1,0 +1,370 @@
+{
+  "state": {
+    "tanks": [
+      {
+        "archetype": "agito",
+        "rarity": "rare",
+        "activity": 15,
+        "quantity": 12
+      },
+      {
+        "archetype": "aemberon",
+        "rarity": "normal",
+        "activity": 1,
+        "quantity": 36
+      },
+      {
+        "archetype": "aemberon",
+        "rarity": "magic",
+        "activity": 5,
+        "quantity": 24
+      },
+      null,
+      null,
+      null
+    ],
+    "hand": [
+      "Osteogenic Powder",
+      "Vivigenic Powder"
+    ],
+    "instruments": [
+      "Contracted Claws"
+    ],
+    "instrumentRounds": [
+      1
+    ],
+    "phase": "potion",
+    "round": 1,
+    "potionRefreshes": 3,
+    "instrumentRefreshes": 0,
+    "shelley": 0
+  },
+  "fields": {
+    "phase": {
+      "sure": false,
+      "guess": "potion"
+    },
+    "tank0.rarity": {
+      "sure": true,
+      "guess": "rare"
+    },
+    "tank0.archetype": {
+      "sure": true,
+      "guess": "agito"
+    },
+    "tank0.activity": {
+      "sure": false,
+      "guess": "15",
+      "score": 0.9408249612311732,
+      "second": 0.5868518262020254
+    },
+    "tank0.quantity": {
+      "sure": false,
+      "guess": "12",
+      "score": 0.9408249612311732,
+      "second": 0.5868518262020254
+    },
+    "tank1.rarity": {
+      "sure": true,
+      "guess": "normal"
+    },
+    "tank1.archetype": {
+      "sure": true,
+      "guess": "aemberon"
+    },
+    "tank1.activity": {
+      "sure": true,
+      "guess": "1",
+      "score": 0.9220176012265913,
+      "second": 0.6181059246478035
+    },
+    "tank1.quantity": {
+      "sure": true,
+      "guess": "36",
+      "score": 0.9220176012265913,
+      "second": 0.6181059246478035
+    },
+    "tank2.rarity": {
+      "sure": true,
+      "guess": "magic"
+    },
+    "tank2.archetype": {
+      "sure": true,
+      "guess": "aemberon"
+    },
+    "tank2.activity": {
+      "sure": true,
+      "guess": "5",
+      "score": 0.9076922686030002,
+      "second": 0.5610134967229379
+    },
+    "tank2.quantity": {
+      "sure": true,
+      "guess": "24",
+      "score": 0.9076922686030002,
+      "second": 0.5610134967229379
+    },
+    "tank3.empty": {
+      "sure": true
+    },
+    "tank4.empty": {
+      "sure": true
+    },
+    "tank5.empty": {
+      "sure": true
+    },
+    "round": {
+      "sure": true,
+      "guess": "1",
+      "score": 0.8271550981700424,
+      "second": 0.4576253366451713
+    },
+    "refreshes": {
+      "sure": true,
+      "guess": "3",
+      "score": 0.943843860773835,
+      "second": 0.6232049434776422
+    },
+    "instrument0": {
+      "sure": true,
+      "guess": "Contracted Claws",
+      "score": 0.9138680500084491,
+      "second": 0.7484822058607657
+    },
+    "hand0": {
+      "sure": false,
+      "guess": "Targeted Xeno-Hormone",
+      "score": 0.9819240334092435,
+      "second": 0.9812123329533711
+    },
+    "hand1": {
+      "sure": true,
+      "guess": "Osteogenic Powder",
+      "score": 10.0,
+      "second": 2.0
+    },
+    "hand2": {
+      "sure": true,
+      "guess": "Vivigenic Powder",
+      "score": 10.0,
+      "second": 2.0
+    }
+  },
+  "problems": [
+    {
+      "kind": "unreadable",
+      "field": "tank0.activity"
+    },
+    {
+      "kind": "unreadable",
+      "field": "tank0.quantity"
+    },
+    {
+      "kind": "unknownArt",
+      "field": "hand0",
+      "crop": {
+        "x": 957.3409722222221,
+        "y": 624.5458333333333,
+        "w": 148.70138888888889,
+        "h": 219.81944444444446
+      }
+    }
+  ],
+  "frame": {
+    "width": 2172,
+    "height": 931
+  },
+  "instrumentRanks": [
+    [
+      [
+        "Contracted Claws",
+        0.9138680500084491
+      ],
+      [
+        "Sloughed Cortex",
+        0.7484822058607657
+      ],
+      [
+        "Clustered Eggs",
+        0.7172836075968526
+      ],
+      [
+        "Aberrant Sprout",
+        0.6922954038428631
+      ],
+      [
+        "Incubation Sac",
+        0.6793772406888903
+      ],
+      [
+        "Hyperplastic Frontal Lobe",
+        0.6727786663895251
+      ],
+      [
+        "Chrysalis Specimen",
+        0.6724554069224299
+      ],
+      [
+        "Eyelid Speculum",
+        0.6404641862557842
+      ],
+      [
+        "Vermicular Spinal Cord",
+        0.6222682415503888
+      ],
+      [
+        "Hypertrophic Pituitary",
+        0.6124309922706516
+      ],
+      [
+        "Sinew Garrote",
+        0.5988290198895005
+      ],
+      [
+        "Egg-Burdened Butterfly",
+        0.5779611888862808
+      ],
+      [
+        "Prismatic Liver",
+        0.5296493047156429
+      ],
+      [
+        "Rawhide Restraint",
+        0.5189992086970724
+      ],
+      [
+        "Adherent Metatarsals",
+        0.5185531663971674
+      ],
+      [
+        "Beak of the Twice-Born",
+        0.4911934724289374
+      ],
+      [
+        "Two-Inch Skull Nail",
+        0.4615724419941257
+      ],
+      [
+        "Canine Teeth File",
+        0.43176398613110695
+      ],
+      [
+        "Aberrant Stinger",
+        0.42531994529189304
+      ],
+      [
+        "Nettle Toggle",
+        0.4234076124978734
+      ],
+      [
+        "Tanned Leather Restraint",
+        0.4089121999983868
+      ],
+      [
+        "Pig Iron Bone Saw",
+        0.40869311681942855
+      ],
+      [
+        "Lady of the Plague Quarter",
+        0.3909557001559684
+      ],
+      [
+        "Black Goat Gut Suture",
+        0.3590611215242337
+      ],
+      [
+        "Fouled Scraper",
+        0.3138905484225118
+      ]
+    ]
+  ],
+  "handRanks": [
+    [
+      [
+        "Targeted Xeno-Hormone",
+        0.9819240334092435
+      ],
+      [
+        "Twin Hormone - Pest",
+        0.9812123329533711
+      ],
+      [
+        "Twin Hormone - Bone Sentry",
+        0.9790944854594931
+      ],
+      [
+        "Xeno-Hormone",
+        0.9743409542996517
+      ],
+      [
+        "Anesthetic Tincture - Aemberon",
+        0.9682018985110294
+      ]
+    ],
+    [],
+    []
+  ],
+  "iconsKnown": [
+    "Hypertrophic Pituitary",
+    "Canine Teeth File",
+    "Aberrant Sprout",
+    "Beak of the Twice-Born",
+    "Fouled Scraper",
+    "Contracted Claws",
+    "Rawhide Restraint",
+    "Hyperplastic Frontal Lobe",
+    "Black Goat Gut Suture",
+    "Sloughed Cortex",
+    "Tanned Leather Restraint",
+    "Pig Iron Bone Saw",
+    "Sinew Garrote",
+    "Adherent Metatarsals",
+    "Egg-Burdened Butterfly",
+    "Incubation Sac",
+    "Vermicular Spinal Cord",
+    "Prismatic Liver",
+    "Eyelid Speculum",
+    "Clustered Eggs",
+    "Chrysalis Specimen",
+    "Aberrant Stinger",
+    "Nettle Toggle",
+    "Lady of the Plague Quarter",
+    "Two-Inch Skull Nail"
+  ],
+  "debug": {
+    "off": 0.178,
+    "corrected": true,
+    "tanks": [
+      {
+        "rgb": [
+          191.0,
+          137.0,
+          53.0
+        ],
+        "total": "",
+        "aq": "15x12"
+      },
+      {
+        "rgb": [
+          183.0,
+          182.0,
+          182.0
+        ],
+        "total": "36",
+        "aq": "1x36"
+      },
+      {
+        "rgb": [
+          157.0,
+          198.0,
+          225.0
+        ],
+        "total": "120",
+        "aq": "5x24"
+      },
+      null,
+      null,
+      null
+    ]
+  }
+}

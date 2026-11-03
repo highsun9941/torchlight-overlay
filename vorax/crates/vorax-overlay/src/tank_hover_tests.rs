@@ -82,3 +82,58 @@ fn tank_label_pointer_hit_test_uses_capture_geometry() {
         assert_eq!(tank_hover::pointer_tank(w,h,1.0,5.0,h as f64-5.0),None);
     }
 }
+
+fn rare_recorded()->Reading {serde_json::from_str(include_str!("../../../fixtures/rare-tank-tooltip/reading.json")).unwrap()}
+fn rare_expected()->TankHoverRead {
+    let mut read=expected();read.name="이단학자".into();read.rarity=Rarity::Rare;read.total=180;read.activity=15;read.quantity=12;read
+}
+
+#[test]
+fn missing_compact_total_does_not_block_a_verified_compact_pair() {
+    let mut r=rare_recorded();let mut read=rare_expected();
+    assert!(r.debug.as_ref().unwrap().tanks[0].as_ref().unwrap().total.is_empty());
+    assert!(!r.fields["tank0.activity"].sure);
+    let association=tank_hover::inspect_target(&read,&r,Some(0));
+    assert_eq!(association.slot,Some(0));assert_eq!(association.candidates[0].1,"matched_activity_quantity");
+    assert_eq!(tank_hover::target(&read,&r,None),Some(0));
+    assert_eq!(tank_hover::target(&read,&r,Some(1)),None);
+    read.activity=12;read.quantity=15;assert_eq!(tank_hover::target(&read,&r,Some(0)),None);
+    read.activity=15;read.quantity=12;
+    r.fields.get_mut("tank0.quantity").unwrap().score=Some(0.74);
+    assert_eq!(tank_hover::target(&read,&r,Some(0)),None,"weak compact ink is not identity evidence");
+    r.fields.get_mut("tank0.quantity").unwrap().score=Some(0.94);
+    r.debug.as_mut().unwrap().tanks[0].as_mut().unwrap().aq="15x12l".into();
+    assert_eq!(tank_hover::target(&read,&r,Some(0)),None);
+    r.debug.as_mut().unwrap().tanks[0].as_mut().unwrap().aq="15x12".into();
+    r.debug.as_mut().unwrap().tanks[0].as_mut().unwrap().total="181".into();
+    assert_eq!(tank_hover::target(&read,&r,Some(0)),None,"do not ignore contradictory source evidence");
+    assert_eq!(tank_hover::positive_number("180 Y"),None);assert_eq!(tank_hover::positive_number("180K"),None);
+}
+
+#[test]
+fn rare_tank_confirmation_advances_to_the_unresolved_card_without_guessing_it() {
+    let mut pipe=Pipeline::new(0);let mut r=rare_recorded();pipe.apply_zoom(&mut r);let read=rare_expected();
+    assert_eq!(pipe.requested_tanks(),[0]);assert!(pipe.requested_slots().is_empty());
+    assert!(!pipe.confirm_tank_hover(0,&read,500.0));assert!(pipe.confirm_tank_hover(0,&read,1000.0));
+    assert!(pipe.requested_tanks().is_empty());assert_eq!(pipe.requested_slots(),[0]);
+    let pending=pipe.pending().unwrap();assert_eq!(pending.state.hand,r.state.hand);assert!(!trustworthy(pending));
+    assert!(pending.fields["tank0.activity"].sure && pending.fields["tank0.quantity"].sure && !pending.fields["hand0"].sure);
+    let feedback=crate::feedback::for_reading(pending,&pipe.requested_slots());
+    assert!(!feedback.title.contains("탱크"));assert!(feedback.title.contains("1번 카드"));assert_eq!(feedback.plan.inspect.len(),1);
+    let mut noisy=rare_recorded();pipe.apply_zoom(&mut noisy);assert_eq!(pipe.requested_slots(),[0]);assert!(pipe.requested_tanks().is_empty());
+    assert!(noisy.fields["tank0.quantity"].sure);assert!(!noisy.fields["hand0"].sure);
+}
+
+#[test]
+fn gold_ornaments_are_removed_without_changing_the_centred_number() {
+    let input=crate::pipeline::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/rare-tank-tooltip/total-ornaments.png")).unwrap();
+    let output=tank_hover::numeric_ink(&input);
+    assert_eq!((input.width,input.height),(492,124));
+    assert!(input.data.chunks_exact(4).zip(output.data.chunks_exact(4)).any(|(a,b)|a!=b));
+    for y in 0..input.height {for x in 0..input.width {
+        let i=(y*input.width+x)*4;
+        if (180..=328).contains(&x) {assert_eq!(&input.data[i..i+4],&output.data[i..i+4]);}
+        if x<170 || x>338 {assert_eq!(&output.data[i..i+4],&[255;4]);}
+    }}
+    let blank=Img{width:300,height:100,data:vec![255;300*100*4]};assert_eq!(tank_hover::numeric_ink(&blank).data,blank.data);
+}

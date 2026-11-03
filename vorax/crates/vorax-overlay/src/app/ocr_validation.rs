@@ -91,8 +91,37 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
     let tank_ok=confirmed && tank_advice && tank_before==[2];
     if !tank_ok {failed.push("tank-tooltip/pipeline".into());}
     let tank_report=json!({"passed":tank_ok,"requestedBefore":tank_before,"result":tank_read,"matchedTank":tank_match,"confirmed":confirmed,"advice":tank_advice,"subsequentOcrCalls":subsequent_ocr,"reading":tank_reading});
+    let rare_partial:vorax_scan::reading::Reading=serde_json::from_slice(&std::fs::read(root.join("rare-tank-tooltip/reading.json")).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    let mut rare_cases=Vec::new();
+    for (file,native) in [("rare-tank-tooltip/popup.png",false),("rare-tank-tooltip/before-0.png",false),("rare-tank-tooltip/before-0.png",true),("rare-tank-tooltip/before-1.png",false),("rare-tank-tooltip/before-1.png",true)] {
+        let frame=load(root,file)?;
+        let frame=if native {vorax_scan::pixels::resize(&frame,2172,931)} else {frame};
+        let mut reader=|img:&Img| {
+            let name=format!("crop-{index:03}.png");index+=1;
+            let _=crate::pipeline::encode_png(&out.join(&name),img.width as u32,img.height as u32,&img.data);
+            let result=ocr.read(img);
+            attempts.push(json!({"file":file,"native":native,"crop":name,"width":img.width,"height":img.height,"text":result.as_ref().ok(),"error":result.as_ref().err().map(|e|e.to_string()),"model":ocr.details()}));
+            result.unwrap_or_default()
+        };
+        let read=vorax_scan::tank_hover::recognize(&frame,&mut reader);
+        let mut pipe=crate::pipeline::Pipeline::new(0);let mut partial=rare_partial.clone();pipe.apply_zoom(&mut partial);
+        let association=read.as_ref().ok().map(|r|vorax_scan::tank_hover::inspect_target(r,&partial,Some(0)));
+        let mut confirmed=false;
+        if let Ok(read)=&read {
+            if (read.activity,read.quantity,read.total)==(15,12,180) {
+                let first=pipe.confirm_tank_hover(0,read,500.0);
+                confirmed=!first && pipe.confirm_tank_hover(0,read,1000.0);
+            }
+        }
+        let mut noisy=rare_partial.clone();pipe.apply_zoom(&mut noisy);
+        let ok=confirmed && pipe.requested_tanks().is_empty() && pipe.requested_slots()==[0]
+            && noisy.fields["tank0.activity"].sure && noisy.fields["tank0.quantity"].sure && !noisy.fields["hand0"].sure
+            && noisy.fields["hand1"].guess==rare_partial.fields["hand1"].guess && noisy.fields["hand2"].guess==rare_partial.fields["hand2"].guess;
+        if !ok {failed.push(format!("{file}/native-{native}"));}
+        rare_cases.push(json!({"file":file,"native":native,"passed":ok,"result":read,"association":association,"confirmed":confirmed,"remainingTanks":pipe.requested_tanks(),"requestedCards":pipe.requested_slots()}));
+    }
     let report=json!({"backend":ocr.backend,"model":ocr.details(),"cases":cases,"attempts":attempts,
-        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"failures":failed});
+        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"rareTankCases":rare_cases,"failures":failed});
     std::fs::write(out.join("model-validation.json"),serde_json::to_vec_pretty(&report).unwrap()).map_err(|e|e.to_string())?;
     println!("PADDLE_VALIDATION {}",serde_json::to_string(&report).unwrap());
     if failed.is_empty() {Ok(())} else {Err(format!("PaddleOCR validation failed: {}",failed.join(", ")))}

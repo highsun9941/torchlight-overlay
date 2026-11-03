@@ -209,9 +209,10 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                                 };
                                 let result=vorax_scan::tank_hover::recognize(&frame,&mut text);
                                 drop(text);
-                                let slot=result.as_ref().ok().and_then(|r|pipe.pending().and_then(|p|vorax_scan::tank_hover::target(r,p,pointer_tank))).filter(|i|requested_tanks.contains(i));
-                                diagnostics::event(hover_id,"tank_hover_ocr",serde_json::json!({"slot":slot,"pointerTank":pointer_tank,"requested":requested_tanks,"result":result,"ocr":texts}));
-                                if result.is_err() || slot.is_none() {diagnostics::save(hover_id,"tank_hover_unverified",&frame,None,pipe.pending(),&texts,&crops,serde_json::json!({"slot":slot,"result":result}));}
+                                let association=result.as_ref().ok().and_then(|r|pipe.pending().map(|p|vorax_scan::tank_hover::inspect_target(r,p,pointer_tank)));
+                                let slot=association.as_ref().and_then(|a|a.slot).filter(|i|requested_tanks.contains(i));
+                                diagnostics::event(hover_id,"tank_hover_ocr",serde_json::json!({"slot":slot,"pointerTank":pointer_tank,"requested":requested_tanks,"association":association,"result":result,"ocr":texts}));
+                                if result.is_err() || slot.is_none() {diagnostics::save(hover_id,"tank_hover_unverified",&frame,None,pipe.pending(),&texts,&crops,serde_json::json!({"slot":slot,"association":association,"result":result}));}
                                 if let (Ok(read),Some(slot))=(result,slot) {
                                     if pipe.confirm_tank_hover(slot,&read,now_ms()) {
                                         diagnostics::event(hover_id,"tank_hover_confirmed",serde_json::json!({"slot":slot,"name":read.name,"activity":read.activity,"quantity":read.quantity,"total":read.total,"remaining":pipe.requested_tanks()}));
