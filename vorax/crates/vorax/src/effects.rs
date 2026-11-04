@@ -485,8 +485,16 @@ pub fn end_of_round(c: &mut Ctx, id: u8) {
             }
             for _ in 0..x {
                 let ne = c.non_empty();
-                for &i in &c.sample(ne, x) {
-                    c.boost(i as i32, 0, 8);
+                if c.d.reference_rules {
+                    for &i in &c.sample(ne, x) {
+                        c.boost(i as i32, 0, 8);
+                    }
+                } else {
+                    // Live round transitions include repeated hits on the same tank,
+                    // even with X occupied pest tanks. Draw each of the X hits separately.
+                    for _ in 0..x {
+                        if let Some(i) = c.pick(&ne) { c.boost(i as i32, 0, 8); }
+                    }
                 }
             }
         }

@@ -116,6 +116,8 @@ pub enum ValueModel {
 }
 
 pub struct Data {
+    /// Reproduce the frozen MIT traces only; live rules are verified against game transitions.
+    pub reference_rules: bool,
     /// the upstream commit the data was exported from
     pub commit: Option<String>,
     pub odds: String,
@@ -309,6 +311,7 @@ impl Data {
         let periodic = instruments.iter().filter(|d| matches!(d.timing, Timing::Periodic(_))).map(|d| d.id).collect();
 
         Ok(Data {
+            reference_rules: false,
             commit: raw.commit,
             odds: raw.odds,
             supreme_chance: raw.supreme_chance,
@@ -389,6 +392,20 @@ pub fn data() -> &'static Data {
 /// For training: the built-in game data with another board value (a model's JSON, or None for none, when boards
 /// are judged by their score). Only before the first `data()` call.
 pub fn use_model(board_value: Option<&str>) -> Result<(), String> {
-    let d = Data::parse(EMBEDDED_GAME, Some(board_value.unwrap_or("null")))?;
+    configure(Some(board_value.unwrap_or("null")), None)
+}
+
+/// Explicit CLI experiment settings; the overlay uses the observed rerolls instead.
+pub fn configure(board_value: Option<&str>, settings: Option<Settings>) -> Result<(), String> {
+    let mut d = Data::parse(EMBEDDED_GAME, Some(board_value.unwrap_or(EMBEDDED_VALUE)))?;
+    if let Some(settings) = settings { d.default_settings = settings; }
+    DATA.set(d).map_err(|_| "game data already loaded".to_string())
+}
+
+/// Replay the original engine without changing its recorded RNG sequence or assertions.
+/// Never used by the overlay, CLI simulations, or model training.
+pub fn use_reference_model(board_value: &str) -> Result<(), String> {
+    let mut d = Data::parse(EMBEDDED_GAME, Some(board_value))?;
+    d.reference_rules = true;
     DATA.set(d).map_err(|_| "game data already loaded".to_string())
 }

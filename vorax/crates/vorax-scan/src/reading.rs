@@ -134,5 +134,6 @@ pub fn empty_state() -> ScreenState {
         potion_refreshes: Some(3),
         instrument_refreshes: None,
         shelley: None,
+        open_box: None,
     }
 }

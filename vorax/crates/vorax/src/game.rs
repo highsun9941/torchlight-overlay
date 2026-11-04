@@ -108,7 +108,8 @@ pub fn deal_instruments(d: &Data, rng: &mut Rng, basic: bool, equipped: &Equips)
     let src = if basic { &d.basic_pool } else { &d.advanced_pool };
     let mut available: StackVec<u8, 64> = StackVec::new();
     for &id in src {
-        if !equipped.iter().any(|e| e.id == id) {
+        // Owned tools can be offered again (and stack); only this hand is distinct.
+        if !d.reference_rules || !equipped.iter().any(|e| e.id == id) {
             available.push(id);
         }
     }

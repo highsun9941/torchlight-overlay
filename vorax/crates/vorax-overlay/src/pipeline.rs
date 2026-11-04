@@ -2,7 +2,8 @@
 //! advisor, lay out the marks for the screen the overlay covers. Shared by the live app and --preview.
 
 use crate::draw::{plan_for, Plan};
-use vorax::advisor::{advise_plan, Advice};
+use vorax::advisor::{advise_plan, Advice, ScreenPhase, ScreenState};
+use vorax::data::{data, Targeting};
 use vorax_scan::layout::layout_at;
 use vorax_scan::live::carried_round;
 use vorax_scan::pixels::Img;
@@ -64,6 +65,8 @@ pub struct Pipeline {
     pub shelley: i32,
     /// instrument rerolls left, as last read on an instrument offer this game (a potion board doesn't show them)
     instrument_refreshes: Option<i32>,
+    /// The last confirmed potion reroll count, hidden on an instrument offer.
+    potion_refreshes: Option<i32>,
     /// the last board advised on, with the size of its picture, for advising again when a setting changes (and
     /// for its round, when the next board's can't be read)
     last: Option<(Reading, usize, usize)>,
@@ -100,9 +103,32 @@ pub fn shelley_rerolls(level: i32) -> i32 {
     [0, 1, 1, 2, 2, 2].get((level - 1).clamp(0, 5) as usize).copied().unwrap_or(0)
 }
 
+/// Identify an opened kit from two complete observations of the same round.
+fn carry_open_box(before: &ScreenState, now: &mut ScreenState) {
+    if before.phase != ScreenPhase::Potion || now.phase != ScreenPhase::Potion
+        || before.round != now.round || before.tanks != now.tanks
+        || before.instruments != now.instruments
+    {
+        return;
+    }
+    now.open_box = before.open_box.clone();
+    if before.hand == now.hand || before.potion_refreshes.is_none()
+        || before.potion_refreshes != now.potion_refreshes
+    {
+        return;
+    }
+    let mut kits = before.hand.iter().filter(|name| data().potion_by_name(name).is_some_and(|id|
+        matches!(data().potion(id).targeting, Targeting::Box(n) if n as usize == now.hand.len())));
+    if let Some(kit) = kits.next() {
+        if kits.next().is_none() {
+            now.open_box = Some(kit.clone());
+        }
+    }
+}
+
 impl Pipeline {
     pub fn new(shelley: i32) -> Pipeline {
-        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, tank_candidate: None, zoom_dirty: false, memory: Default::default(), protocols: false, resumed: false }
+        Pipeline { last_advice: None, card_frames: None, tracker: InstrumentTracker::default(), shelley, instrument_refreshes: None, potion_refreshes: None, last: None, last_current: false, pending: None, zoom_board: String::new(), zoom_names: Default::default(), zoom_candidate: None, tank_candidate: None, zoom_dirty: false, memory: Default::default(), protocols: false, resumed: false }
     }
 
     pub fn ui(&self) -> f64 { self.pending.as_ref().map(|r|r.ui()).unwrap_or_else(||self.last.as_ref().map_or(1.0, |(r, ..)| r.ui())) }
@@ -223,7 +249,9 @@ impl Pipeline {
     /// else what the Shelley level starts a game with. (Upstream counts them as 0 on a potion board.)
     fn fill_rerolls(&mut self, reading: &mut Reading) {
         match reading.state.phase {
-            vorax::advisor::ScreenPhase::Instrument => {
+            ScreenPhase::Instrument => {
+                let opening = reading.state.round == Some(1) && reading.state.instruments.is_empty();
+                reading.state.potion_refreshes = self.potion_refreshes.or(opening.then_some(3));
                 if reading.fields.get("refreshes").is_some_and(|f| f.sure) {
                     self.instrument_refreshes = reading.state.instrument_refreshes;
                 } else if shelley_rerolls(self.shelley) == 0
@@ -236,6 +264,11 @@ impl Pipeline {
                 }
             }
             _ => {
+                if reading.state.phase == ScreenPhase::Potion
+                    && reading.fields.get("refreshes").is_some_and(|f| f.sure)
+                {
+                    self.potion_refreshes = reading.state.potion_refreshes;
+                }
                 if reading.state.instrument_refreshes.is_none() {
                     reading.state.instrument_refreshes = Some(self.instrument_refreshes.unwrap_or(shelley_rerolls(self.shelley)));
                 }
@@ -325,6 +358,8 @@ impl Pipeline {
         let trigger = if self.resumed { None } else { trigger };
         if trigger == Some("screen") {
             self.instrument_refreshes = None;
+            self.potion_refreshes = None;
+            self.last = None;
             self.protocols = false;
         }
         // a new game opens with "screen" and an instrument offer: cards in hand
@@ -353,6 +388,9 @@ impl Pipeline {
         self.apply_zoom(&mut reading);
         let read_ms = t.elapsed().as_secs_f64() * 1000.0;
         if !trustworthy(&reading) { return Outcome::Uncertain { reading: Box::new(reading) }; }
+        if let Some((previous, ..)) = &self.last {
+            carry_open_box(&previous.state, &mut reading.state);
+        }
         let (advice, cached) = self.advise(&reading.state);
         let l = layout_at(img.width, img.height, reading.ui()).shifted_hand(reading.hand_dy.unwrap_or(0.0));
         self.card_frames = crate::card_frame::detect(&img, &l, reading.state.hand.len());
@@ -428,6 +466,63 @@ pub fn encode_png(path: &std::path::Path, w: u32, h: u32, rgba: &[u8]) -> Result
 #[cfg(test)]
 mod tests {
     use super::resumes;
+
+    #[test]
+    fn instrument_offers_carry_only_confirmed_potion_rerolls() {
+        use super::{Pipeline, ScreenPhase};
+        use vorax_scan::reading::FieldRead;
+
+        let frame = super::Img::new(1, 1);
+        let mut reading = super::scan(&frame, super::scan_data(), false);
+        let mut pipeline = Pipeline::new(3);
+        reading.state.phase = ScreenPhase::Instrument;
+        reading.fields.insert("refreshes".into(), FieldRead::sure(true));
+        reading.state.instrument_refreshes = Some(1);
+        pipeline.fill_rerolls(&mut reading);
+        assert_eq!(reading.state.potion_refreshes, Some(3));
+
+        reading.state.phase = ScreenPhase::Potion;
+        reading.state.potion_refreshes = Some(2);
+        reading.state.instrument_refreshes = None;
+        pipeline.fill_rerolls(&mut reading);
+        assert_eq!(reading.state.instrument_refreshes, Some(1));
+        reading.fields.insert("refreshes".into(), FieldRead::sure(false));
+        reading.state.potion_refreshes = Some(0);
+        pipeline.fill_rerolls(&mut reading);
+
+        reading.state.round = Some(5);
+        reading.state.phase = ScreenPhase::Instrument;
+        reading.state.instruments.push("Incubation Sac".into());
+        pipeline.fill_rerolls(&mut reading);
+        assert_eq!(reading.state.potion_refreshes, Some(2));
+        Pipeline::new(3).fill_rerolls(&mut reading);
+        assert_eq!(reading.state.potion_refreshes, None);
+    }
+
+    #[test]
+    fn an_observed_open_kit_keeps_its_pool_until_the_round_changes() {
+        use super::carry_open_box;
+        use vorax_scan::reading::empty_state;
+
+        let mut before = empty_state();
+        before.hand = ["Rare Potion Kit (Small)", "Vivigenic Powder", "Xeno-Hormone"].map(str::to_owned).to_vec();
+        let mut opened = before.clone();
+        opened.hand = ["Green Bile Solution", "Twin Hormone - Pest", "Purest Holy Water"].map(str::to_owned).to_vec();
+        carry_open_box(&before, &mut opened);
+        assert_eq!(opened.open_box.as_deref(), Some("Rare Potion Kit (Small)"));
+        let mut rerolled = opened.clone();
+        rerolled.open_box = None;
+        rerolled.potion_refreshes = Some(2);
+        carry_open_box(&before, &mut rerolled);
+        assert_eq!(rerolled.open_box, None);
+        carry_open_box(&opened, &mut rerolled);
+        assert_eq!(rerolled.open_box, opened.open_box);
+
+        let mut next = empty_state();
+        next.round = Some(2);
+        carry_open_box(&rerolled, &mut next);
+        assert_eq!(next.open_box, None);
+    }
 
     fn round_ten(file:&str)->super::Img {
         super::decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/round10").join(file)).unwrap()

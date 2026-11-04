@@ -62,7 +62,7 @@ struct Game {
 /// with a share `eps` of moves played at random so boards a better player reaches are seen too.
 fn play(seed: u32, eps: f64, smart: bool) -> Game {
     let d = data();
-    let chooser = Chooser::Ev(Policy { samples: 2, horizon: 0, roll_samples: None, steer: Some(0.3), value: Some(smart) });
+    let chooser = Chooser::Ev(Policy { samples: 2, horizon: 0, roll_samples: None, steer: Some(0.3), value: Some(smart), goal: Goal::Target });
     let mut s = create_game(d.default_settings, None, Some(seed));
     let mut rng = Rng::new(mix(seed, 0xbeef));
     let mut boards = Vec::with_capacity(40);
@@ -95,11 +95,11 @@ fn play(seed: u32, eps: f64, smart: bool) -> Game {
         }
         if rng.chance(eps) {
             let os = options(&s);
-            s = if can_refresh(&s) && s.open_box.is_none() && rng.chance(0.2) { dispatch(&s, Action::Refresh) } else { play_opt(&s, &os[rng.int(os.len())]) };
+            s = if can_refresh(&s) && rng.chance(0.2) { dispatch(&s, Action::Refresh) } else { play_opt(&s, &os[rng.int(os.len())]) };
             continue;
         }
         let c = chooser.choose(&s, mix(seed, g));
-        if s.open_box.is_none() && c.value <= c.stay.unwrap_or(ultimate_activity(&s) as f64) && can_refresh(&s) {
+        if c.value <= c.stay.unwrap_or(ultimate_activity(&s) as f64) && can_refresh(&s) {
             s = dispatch(&s, Action::Refresh);
             continue;
         }
@@ -280,21 +280,28 @@ pub fn train(games: u32, check: u32, seed0: u32, eps: f64, smart: bool, out: &st
     println!("wrote {out} ({games} games to learn from, {check} to check, {:.0} s)", t.elapsed().as_secs_f64());
 }
 
-/// Plays `games` games from `seed0` with `chooser` and `picker` on every core, with progress: each seed's score.
-pub fn scores(games: u32, seed0: u32, chooser: &Chooser, picker: &Picker) -> Vec<(u32, i64)> {
+pub struct Outcome {
+    pub seed: u32,
+    pub score: i64,
+    pub monsters: i64,
+    pub groups: usize,
+}
+
+/// Plays games with progress, keeping score and combat population from the same ending.
+pub fn outcomes(games: u32, seed0: u32, chooser: &Chooser, picker: &Picker) -> Vec<Outcome> {
     let done = AtomicUsize::new(0);
     let t = Instant::now();
     let step = (games as usize / 100).max(1);
     let out = (seed0..seed0 + games)
         .into_par_iter()
         .map(|seed| {
-            let score = ultimate_activity(&run_game(seed, chooser, picker, None));
+            let end = run_game(seed, chooser, picker, None);
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
             if n % step == 0 {
                 let rate = n as f64 / t.elapsed().as_secs_f64();
                 eprint!("\r{n} of {games} games ({rate:.1}/s, {:.0} s left)   ", (games as usize - n) as f64 / rate);
             }
-            (seed, score)
+            Outcome { seed, score: ultimate_activity(&end), monsters: end.monsters().map(|m| m.quantity).sum(), groups: end.monsters().count() }
         })
         .collect();
     eprintln!();

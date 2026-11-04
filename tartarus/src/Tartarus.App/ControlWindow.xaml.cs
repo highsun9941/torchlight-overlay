@@ -791,6 +791,7 @@ public partial class ControlWindow : Window
                 // No log's day (none, or a run's length it doesn't tell): the count last read in this run, not none
                 // (a red screen or a popup darkens it, and none would be taken for the run's first day).
                 _hintSandbox.Days ??= _run.LastDays;
+                if (settle == BoardSettle.Verdict.Take) _run.RememberDestinations(_hintSandbox);
                 // A run the log saw from its start: its Chromatic count, or the panel's when higher (a sound can go missing).
                 if (live is { FromStart: true }) _hintSandbox.Chromatic = Math.Max(_hintSandbox.Chromatic, live.ChromaticAtLeast);
                 // The Sandbox viewed from a pick is read now: back to the pick is the hint.
@@ -875,6 +876,7 @@ public partial class ControlWindow : Window
                     && (objective == Tartarus.Rules.ObjectiveKind.SurvivalOfTheFittest ? live.Consumes
                         : objective == Tartarus.Rules.ObjectiveKind.Undercurrents ? live.Incidents : -1) is int counted and >= 0)
                     observation.ObjectiveProgress = Math.Max(observation.ObjectiveProgress, Math.Min(counted, Tartarus.Rules.GameData.Target(objective)));
+                _run.RememberObjective(observation);
                 if (_hints.Request(observation, consumeOnly, huntPick)) ClearHint();
             }
             else if (r.Pick is { } pick)
@@ -931,6 +933,7 @@ public partial class ControlWindow : Window
                     // Re-rolls left as worked out above: the counter shows a moment after the cards (until then the log
                     // tells), and a Warden's Treasure pick has none of its own (the run's go to later offers).
                     var observation = Tartarus.Vision.GameObservation.FromPick(pick, under, text);
+                    _run.PreparePick(observation);
                     if (_rerolls is { } left) observation.Rerolls = left;
                     if (_hints.Request(observation, consumeOnly: false)) ClearHint();
                 }
