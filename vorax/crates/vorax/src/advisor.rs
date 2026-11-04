@@ -8,7 +8,7 @@ use crate::types::*;
 use serde::{Deserialize, Serialize, Serializer};
 use std::time::Instant;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenMonster {
     pub archetype: Archetype,
@@ -47,6 +47,9 @@ pub struct ScreenState {
     /// Intern Shelley level (only changes the instrument rerolls a new game starts with)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shelley: Option<i32>,
+    /// The potion kit whose contents are on screen, when established by a same-round transition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_box: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,6 +92,8 @@ impl Serialize for Best {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Advice {
+    #[serde(skip_serializing_if = "Goal::is_target")]
+    pub goal: Goal,
     pub best: Best,
     pub ranking: Vec<Ranked>,
     pub board: i64,
@@ -105,11 +110,11 @@ pub struct Advice {
 }
 
 /// Potion look-ahead: each card on offer, the next best options up to 4, and a reroll, each played to the end 64 times.
-pub const LOOK_AHEAD: LookAhead = LookAhead { top: 4, playouts: 64, steer: Some(0.3), inner_samples: None, value: Some(true), halving: None };
+pub const LOOK_AHEAD: LookAhead = LookAhead { top: 4, playouts: 64, steer: Some(0.3), inner_samples: None, value: Some(true), halving: None, goal: Goal::Target };
 /// Futures per instrument choice, each judged by its final score counted up to 840k.
 pub const INSTRUMENT_FUTURES: u32 = 64;
 /// How the rounds inside an instrument choice's futures are played: by the smarter player (the board value).
-const INSTRUMENT_ROLLOUT: Policy = Policy { samples: 4, horizon: 0, roll_samples: None, steer: None, value: Some(true) };
+const INSTRUMENT_ROLLOUT: Policy = Policy { samples: 4, horizon: 0, roll_samples: None, steer: None, value: Some(true), goal: Goal::Target };
 /// A few rounds of look-ahead, only to order options that score the same this round.
 const TIE_BREAK: Policy = Policy::new(32, 4);
 /// How close a do-nothing move's value must be for a move that does something to go first instead.
@@ -181,11 +186,15 @@ pub fn to_state(x: &ScreenState, unknown: &mut Vec<String>) -> GameState {
     GameState {
         tanks,
         instruments: equipped,
-        round: x.round.unwrap_or(1),
+        // A reward tool is shown after the printed round's effects have run.
+        // The engine's instrument phase already belongs to the following round.
+        round: x.round.unwrap_or(1) + i32::from(!data().reference_rules && x.phase == ScreenPhase::Instrument && !x.instruments.is_empty()),
         phase: if potion { Phase::PotionSelect } else { Phase::InstrumentSelect },
         hand,
         potion_refreshes: x.potion_refreshes.unwrap_or(0),
         instrument_refreshes: x.instrument_refreshes.unwrap_or(0),
+        open_box: x.open_box.as_deref().and_then(|n| data().potion_by_name(n))
+            .filter(|&id| matches!(data().potion(id).targeting, Targeting::Box(_))),
         // past thresholds only matter for whether more instruments are coming
         t8000: had >= 2,
         t28000: had >= 3,
@@ -197,10 +206,17 @@ pub fn to_state(x: &ScreenState, unknown: &mut Vec<String>) -> GameState {
 #[derive(Clone, Debug)]
 pub enum Work {
     Potion { s: GameState, seed: u32, la: LookAhead, opts: Vec<(Opt, f64)>, futures: u32 },
-    Instrument { s: GameState, seed: u32, choices: Vec<Pick>, futures: u32 },
+    Instrument { s: GameState, seed: u32, goal: Goal, choices: Vec<Pick>, futures: u32 },
 }
 
 impl Work {
+    pub fn goal(&self) -> Goal {
+        match self {
+            Work::Potion { la, .. } => la.goal,
+            Work::Instrument { goal, .. } => *goal,
+        }
+    }
+
     pub fn futures(&self) -> u32 {
         match self {
             Work::Potion { futures, .. } | Work::Instrument { futures, .. } => *futures,
@@ -215,11 +231,15 @@ pub enum Prepared {
 
 /// The advice that needs no futures (a protocol, a Xenopanacea or Holy Water rite), or the futures to play for it.
 pub fn prepare(x: &ScreenState, futures: Option<u32>) -> Prepared {
+    prepare_for_goal(x, futures, Goal::Target)
+}
+
+pub fn prepare_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal) -> Prepared {
     let t0 = Instant::now();
     let mut unknown = Vec::new();
     // Surgical Protocols change the endgame battle, not Ultimate Activity
     if x.phase == ScreenPhase::Protocol {
-        return Prepared::Done(Advice { best: Best::Nothing, ranking: vec![], board: 0, refresh_end: None, plan: false, final_: true, ms: 0, unknown, note: None });
+        return Prepared::Done(Advice { goal, best: Best::Nothing, ranking: vec![], board: 0, refresh_end: None, plan: false, final_: true, ms: 0, unknown, note: None });
     }
     // a ULT the simulator can't play out (a Xenopanacea, a Holy Water rite) is always taken: it's worth more than
     // anything beside it
@@ -228,6 +248,7 @@ pub fn prepare(x: &ScreenState, futures: Option<u32>) -> Prepared {
             let pick = Ranked { index: xeno, targets: vec![], value: 0.0, end: None, no_effect: None };
             let board = ultimate_activity(&to_state(&ScreenState { hand: vec![], ..x.clone() }, &mut Vec::new()));
             return Prepared::Done(Advice {
+                goal,
                 best: Best::Card(pick.clone()),
                 ranking: vec![pick],
                 board,
@@ -243,13 +264,13 @@ pub fn prepare(x: &ScreenState, futures: Option<u32>) -> Prepared {
     let s = to_state(x, &mut unknown);
     let work = if s.phase == Phase::PotionSelect {
         let n = futures.unwrap_or(LOOK_AHEAD.playouts);
-        Work::Potion { s, seed: SEED, la: LookAhead { playouts: n, ..LOOK_AHEAD }, opts: shortlist(&s, SEED, &LOOK_AHEAD), futures: n }
+        Work::Potion { s, seed: SEED, la: LookAhead { playouts: n, goal, ..LOOK_AHEAD }, opts: shortlist(&s, SEED, &LOOK_AHEAD), futures: n }
     } else {
         let mut choices: Vec<Pick> = (0..s.hand.len()).map(Pick::Card).collect();
         if can_refresh(&s) {
             choices.push(Pick::Refresh);
         }
-        Work::Instrument { s, seed: SEED, choices, futures: futures.unwrap_or(INSTRUMENT_FUTURES) }
+        Work::Instrument { s, seed: SEED, goal, choices, futures: futures.unwrap_or(INSTRUMENT_FUTURES) }
     };
     Prepared::Work { work, x: x.clone(), unknown, t0 }
 }
@@ -261,7 +282,7 @@ pub fn play_work(w: &Work, from: u32, to: u32, par: bool) -> Vec<Tally> {
             let o: Vec<Opt> = opts.iter().map(|c| c.0).collect();
             potion_futures(s, *seed, la, &o, from, to, par)
         }
-        Work::Instrument { s, seed, choices, .. } => instrument_futures(s, *seed, choices, &Chooser::Ev(INSTRUMENT_ROLLOUT), Goal::Target, from, to, par),
+        Work::Instrument { s, seed, goal, choices, .. } => instrument_futures(s, *seed, choices, &Chooser::Ev(Policy { goal: *goal, ..INSTRUMENT_ROLLOUT }), *goal, from, to, par),
     }
 }
 
@@ -322,13 +343,14 @@ fn on_screen(x: &ScreenState, mut a: Advice) -> Advice {
 
 /// The advice from the futures played (every option's totals).
 pub fn conclude(work: &Work, x: &ScreenState, unknown: Vec<String>, t0: Instant, tallies: &[Tally]) -> Advice {
+    let goal = work.goal();
     let mean = |t: &Tally| t.goal / t.n as f64;
     let reached = |t: &Tally| t.reached as f64 / t.n as f64;
     let (s, ranking, best, refresh_end, plan) = match work {
         Work::Potion { s, opts, .. } => {
             // options dropped early by halving (fewer futures) rank below the ones kept
-            let mut ahead: Vec<(Opt, f64, f64, u32)> = opts.iter().zip(tallies).map(|(c, t)| (c.0, mean(t), reached(t), t.n)).collect();
-            ahead.sort_by(|a, b| b.3.cmp(&a.3).then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)));
+            let mut ahead: Vec<(Opt, f64, f64, u32, usize)> = opts.iter().zip(tallies).enumerate().map(|(i,(c,t))| (c.0, mean(t), reached(t), t.n, i)).collect();
+            ahead.sort_by(|a, b| b.3.cmp(&a.3).then_with(|| tallies[b.4].compare(&tallies[a.4],goal)));
             let reroll = ahead.iter().position(|a| a.0 == Opt::Refresh);
             let refresh_end = reroll.map(|i| End { activity: ahead[i].1, reached: ahead[i].2 });
             let ranked: Vec<Ranked> = ahead
@@ -337,10 +359,14 @@ pub fn conclude(work: &Work, x: &ScreenState, unknown: Vec<String>, t0: Instant,
                 .filter(|(i, _)| Some(*i) != reroll)
                 .map(|(_, a)| Ranked { end: Some(End { activity: a.1, reached: a.2 }), ..to_ranked(&a.0, js_round(a.1)) })
                 .collect();
-            let ranking = mark_no_effect(s, ranked);
+            let ranking = if goal == Goal::Target && data().reference_rules {
+                mark_no_effect(s, ranked)
+            } else {
+                ranked.into_iter().map(|r| if card_changes(s, r.index, &r.targets) { r } else { Ranked { no_effect: Some(true), ..r } }).collect()
+            };
             let mut best = if reroll == Some(0) { Best::Refresh } else { ranking.first().cloned().map_or(Best::Nothing, Best::Card) };
             // a Potion Kit on offer is taken before a refresh
-            if best == Best::Refresh {
+            if goal == Goal::Target && data().reference_rules && best == Best::Refresh {
                 if let Some(k) = ranking.iter().find(|r| is_kit(s, r.index)) {
                     best = Best::Card(k.clone());
                 }
@@ -356,10 +382,14 @@ pub fn conclude(work: &Work, x: &ScreenState, unknown: Vec<String>, t0: Instant,
                     Pick::Refresh => None,
                 })
                 .collect();
-            ranking.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+            let score = |r: &Ranked| if goal == Goal::Mean || !data().reference_rules { r.end.expect("simulated offer").activity } else { r.value };
+            let tally = |r: &Ranked| &tallies[choices.iter().position(|c| *c == Pick::Card(r.index)).unwrap()];
+            ranking.sort_by(|a, b| if data().reference_rules { score(b).partial_cmp(&score(a)).unwrap_or(std::cmp::Ordering::Equal) }
+                else { tally(b).compare(tally(a),goal) });
             let refresh_end = choices.iter().position(|c| *c == Pick::Refresh).map(|r| End { activity: mean(&tallies[r]), reached: reached(&tallies[r]) });
             let best = match (refresh_end, ranking.first()) {
-                (Some(e), Some(top)) if e.activity > top.value => Best::Refresh,
+                (Some(e), Some(top)) if if data().reference_rules { e.activity > score(top) }
+                    else { tallies[choices.iter().position(|c| *c == Pick::Refresh).unwrap()].compare(tally(top),goal).is_gt() } => Best::Refresh,
                 (_, Some(top)) => Best::Card(top.clone()),
                 (Some(_), None) => Best::Refresh,
                 (None, None) => Best::Nothing,
@@ -367,7 +397,7 @@ pub fn conclude(work: &Work, x: &ScreenState, unknown: Vec<String>, t0: Instant,
             (s, ranking, best, refresh_end, false)
         }
     };
-    on_screen(x, Advice { best, ranking, board: ultimate_activity(s), refresh_end, plan, final_: true, ms: t0.elapsed().as_millis() as u64, unknown, note: None })
+    on_screen(x, Advice { goal, best, ranking, board: ultimate_activity(s), refresh_end, plan, final_: true, ms: t0.elapsed().as_millis() as u64, unknown, note: None })
 }
 
 /// The Solver's advice, with every future played (spread over every core when `par`).
@@ -378,7 +408,11 @@ pub fn advise_plan(x: &ScreenState, futures: Option<u32>, par: bool) -> Advice {
 /// `advise_plan`, the potions' futures spread by successive halving when `halving` (`halved_futures`): the same
 /// futures on average, most of them on the close calls between the best options.
 pub fn advise_halved(x: &ScreenState, futures: Option<u32>, halving: bool, par: bool) -> Advice {
-    match prepare(x, futures) {
+    advise_for_goal(x, futures, Goal::Target, halving, par)
+}
+
+pub fn advise_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal, halving: bool, par: bool) -> Advice {
+    match prepare_for_goal(x, futures, goal) {
         Prepared::Done(a) => a,
         Prepared::Work { work, x, unknown, t0 } => {
             let tallies = match &work {
@@ -421,7 +455,7 @@ pub fn advise(x: &ScreenState, samples: u32, plan: bool, par: bool) -> Advice {
             best = Best::Card(k.clone());
         }
     }
-    on_screen(x, Advice { best, ranking, board: ua, refresh_end: None, plan: false, final_: false, ms: t0.elapsed().as_millis() as u64, unknown, note: None })
+    on_screen(x, Advice { goal: Goal::Target, best, ranking, board: ua, refresh_end: None, plan: false, final_: false, ms: t0.elapsed().as_millis() as u64, unknown, note: None })
 }
 
 /// Every card and instrument name the screen reader should know about.

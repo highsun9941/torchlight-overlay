@@ -13,6 +13,8 @@ public sealed record RuleOptions
     public double[] DoorWeights { get; init; } = [45, 35, 10, 8, 2];
     /// <summary>Rarity weights of the Inmate a Replace brings in (30,000 runs' boards).</summary>
     public double[] ReplaceWeights { get; init; } = [42, 34, 11.5, 9.5, 2.5];
+    /// <summary>Rarity weights of a Replace with Hangman's Noose held; null: <see cref="ReplaceWeights"/> without Normal and Magic.</summary>
+    public double[]? NooseReplaceWeights { get; init; }
     /// <summary>A Replace never brings in the Code it replaced (0.3% of 30,000 runs' Replaces did: read as never).</summary>
     public bool ReplaceNewCode { get; init; } = true;
     /// <summary>Rarity weights of the Inmates already out when a run starts (10,950 first boards).</summary>
@@ -29,10 +31,11 @@ public sealed record RuleOptions
     public double RoomOdds { get; init; } = 1;
 
     /// <summary>
-    /// % of mornings with one Destination card fewer (2 instead of 3) for no instrument's sake: 36 of 207 such mornings
-    /// in the user's frames (17.4%).
+    /// % of mornings with one Destination card fewer (2 instead of 3) for no instrument's sake. None in the game: the
+    /// 2026-10-31 audit of the user's logged runs found 2 cards on all 65 mornings with Barbed Whip, Forged Key or
+    /// Burning Stake held and on none of ~1050 without (the old 17% counted frames whose instrument wasn't read).
     /// </summary>
-    public double FewerDestinationsPercent { get; init; } = 17;
+    public double FewerDestinationsPercent { get; init; } = 0;
 
     /// <summary>% of runs that start with a Prison Incident marker on a random Unopened cell.</summary>
     public double IncidentStartPercent { get; init; } = 100;

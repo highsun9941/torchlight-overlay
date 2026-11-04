@@ -67,6 +67,41 @@ public class GameTextTests
         Assert.Single(o.Treasures);
     }
 
+    [Theory]
+    [InlineData(ObjectiveKind.Undercurrents, false, 12, true)]
+    [InlineData(ObjectiveKind.PrisonWalk, true, 12, true)]
+    [InlineData(ObjectiveKind.PrisonWalk, true, 11, false)]
+    [InlineData(ObjectiveKind.PrisonWalk, false, 12, false)]
+    public void Objective_reward_observes_a_deferred_incident(ObjectiveKind kind, bool marked, int day, bool deferred)
+    {
+        var run = new RunMemory();
+        var under = EditableSandbox.Empty();
+        under.Phase = Phases.Destination;
+        under.Days = 12;
+        under.Destinations.Add(7);
+        under[7].Incident = marked;
+        run.RememberDestinations(under);
+        run.RememberObjective(new Observation { Objective = kind, ObjectiveProgress = 2 });
+
+        under.Warden = 7;
+        under.Days = day;
+        under[7].Incident = false; // The reward popup covers the objective and the marker has disappeared.
+        under.Instruments.Add("axe");
+        var pick = new PickRead { Kind = PickRead.Instrument, Cards = [new PickCardRead { Index = 1, Id = "hook" }] };
+        var observation = GameObservation.FromPick(pick, under);
+        run.PreparePick(observation);
+
+        Assert.True(observation.OfferForObjective);
+        Assert.Equal(kind, observation.Objective);
+        Assert.Equal(deferred, observation.IncidentAfterPick);
+
+        run.NewRun();
+        var opening = GameObservation.FromPick(pick, EditableSandbox.Empty());
+        run.PreparePick(opening);
+        Assert.Null(opening.Objective);
+        Assert.False(opening.IncidentAfterPick);
+    }
+
     /// <summary>Lines as OCR gives them, by region, laid out on a 1920x1200 screen (cards left to right).</summary>
     private static ScreenText Parse(params (string Role, string Text)[] lines)
     {

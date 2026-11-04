@@ -1,3 +1,5 @@
+using R = Tartarus.Rules;
+
 namespace Tartarus.Vision;
 
 /// <summary>
@@ -13,6 +15,9 @@ public sealed class RunMemory
     private int _chromatic;
     private int? _chromaticSeen;
     private DateTimeOffset _chromaticSince;
+    private (R.ObjectiveKind Kind, int Progress, bool Done)? _objective;
+    private (R.ObjectiveKind Kind, int Reads)? _otherObjective;
+    private (int Days, HashSet<int> Cells)? _markedDestinations;
     private string? _theme;
     /// <summary>The theme was seen since the last Sandbox: it is the coming run's.</summary>
     private bool _themeComing;
@@ -106,6 +111,47 @@ public sealed class RunMemory
         return _chromatic;
     }
 
+    /// <summary>Keep the last marked destinations for the reward pick that may cover the board after moving.</summary>
+    public void RememberDestinations(EditableSandbox board)
+    {
+        if (board.Days is int days && board.Phase == Phases.Destination && board.Destinations.Count > 0)
+            _markedDestinations = (days, board.Destinations.Where(d => d > 1 && board[d].Incident).ToHashSet());
+    }
+
+    /// <summary>Keep the objective through covered panels and short misreads during a transition.</summary>
+    public void RememberObjective(R.Observation observation)
+    {
+        if (observation.Objective is { } kind && _objective is { } known && kind != known.Kind)
+        {
+            int reads = _otherObjective is { } other && other.Kind == kind ? other.Reads + 1 : 1;
+            _otherObjective = (kind, reads);
+            if (reads >= 3) _objective = null;
+        }
+        else _otherObjective = null;
+
+        RestoreObjective(observation);
+        if (observation.Objective is { } current)
+            _objective = (current, observation.ObjectiveProgress, observation.ObjectiveDone);
+    }
+
+    /// <summary>A move onto a marked cell can display the objective reward before its incident plays out.</summary>
+    public void PreparePick(R.Observation observation)
+    {
+        if (!observation.StartOfRun) RestoreObjective(observation);
+        observation.IncidentAfterPick = observation.OfferForObjective &&
+            (observation.Objective == R.ObjectiveKind.Undercurrents ||
+                _markedDestinations is { } marked && marked.Days == observation.RemainingDays &&
+                marked.Cells.Contains(observation.Warden + 1));
+    }
+
+    private void RestoreObjective(R.Observation observation)
+    {
+        if (_objective is not { } known) return;
+        if (observation.Objective != known.Kind)
+            (observation.Objective, observation.ObjectiveProgress) = (known.Kind, known.Progress);
+        observation.ObjectiveDone |= known.Done;
+    }
+
     public void Clear()
     {
         _held.Clear();
@@ -113,6 +159,9 @@ public sealed class RunMemory
         _lastDays = null;
         _chromatic = 0;
         _chromaticSeen = null;
+        _objective = null;
+        _otherObjective = null;
+        _markedDestinations = null;
         _theme = null;
         _themeComing = false;
     }

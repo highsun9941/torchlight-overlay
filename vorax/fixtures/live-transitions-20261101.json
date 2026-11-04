@@ -1,0 +1,3674 @@
+[
+  {
+    "after": {
+      "hand": [
+        "Anesthetic Tincture - Agito",
+        "Twin Hormone - Bone Sentry",
+        "Rare Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Viscous Bile Solution",
+        "Spinal Solution - Agito",
+        "Potent Xenopurge Powder"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 1,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Twin Hormone - Bone Sentry",
+        "Vivigenic Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Anesthetic Tincture - Agito",
+        "Twin Hormone - Bone Sentry",
+        "Rare Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 1,
+    "step": 2,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Xenopurge Powder",
+        "Green Bile Solution",
+        "Targeted Xeno-Hormone"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Twin Hormone - Bone Sentry",
+        "Vivigenic Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 3,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Targeted Xeno-Hormone",
+        "Mutagenic Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Xenopurge Powder",
+        "Green Bile Solution",
+        "Targeted Xeno-Hormone"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 4,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Green Bile Solution",
+        "Bewitching Tincture",
+        "Gray Matter Spinal Solution"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 2,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 75,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "magic"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 20,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Targeted Xeno-Hormone",
+        "Mutagenic Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 15,
+          "archetype": "aemberon",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 13,
+    "step": 5,
+    "targets": [
+      0
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Black Goat Gut Suture",
+        "Sloughed Cortex",
+        "Sinew Garrote"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "instrument",
+      "potionRefreshes": 1,
+      "round": 2,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 195,
+          "archetype": "agito",
+          "quantity": 44,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Green Bile Solution",
+        "Bewitching Tincture",
+        "Gray Matter Spinal Solution"
+      ],
+      "instrumentRefreshes": 1,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Chrysalis Specimen"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 2,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 75,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "magic"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 20,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 1,
+    "seed": 1,
+    "step": 6,
+    "targets": [
+      0
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Xeno-Hormone",
+        "Potent Xenopurge Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 226,
+          "archetype": "boneSentry",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "rare"
+        },
+        {
+          "activity": 32,
+          "archetype": "agito",
+          "quantity": 44,
+          "rarity": "magic"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Mutagenic Powder",
+        "Bewitching Tincture",
+        "Green Bile Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 3,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 195,
+          "archetype": "agito",
+          "quantity": 44,
+          "rarity": "rare"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 5,
+    "step": 9,
+    "targets": [
+      0,
+      2
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Hollow Spinal Solution",
+        "Osteolytic Ointment",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 226,
+          "archetype": "boneSentry",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 20,
+          "archetype": "boneSentry",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 32,
+          "archetype": "agito",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 6,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 20,
+          "archetype": "boneSentry",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Xeno-Hormone",
+        "Potent Xenopurge Powder",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 226,
+          "archetype": "boneSentry",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 15,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "rare"
+        },
+        {
+          "activity": 32,
+          "archetype": "agito",
+          "quantity": 44,
+          "rarity": "magic"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 0,
+    "seed": 28028,
+    "step": 10,
+    "targets": [
+      1
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Canine Teeth File",
+        "Rawhide Restraint",
+        "Black Goat Gut Suture"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "instrument",
+      "potionRefreshes": 0,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 136,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 96,
+          "rarity": "rare"
+        },
+        null,
+        null,
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 96,
+          "rarity": "rare"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Hollow Spinal Solution",
+        "Osteolytic Ointment",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 226,
+          "archetype": "boneSentry",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 20,
+          "archetype": "boneSentry",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 32,
+          "archetype": "agito",
+          "quantity": 52,
+          "rarity": "magic"
+        },
+        {
+          "activity": 6,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 20,
+          "archetype": "boneSentry",
+          "quantity": 12,
+          "rarity": "rare"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 1,
+    "seed": 1,
+    "step": 11,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Spinal Solution - Aemberon",
+        "Leptomeningeal Solution",
+        "Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 7,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 144,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 104,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 104,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Rare Potion Kit (Small)",
+        "Twin Hormone - Pest",
+        "Osteolytic Ointment"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 6,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 136,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 96,
+          "rarity": "rare"
+        },
+        null,
+        null,
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 96,
+          "rarity": "rare"
+        },
+        null
+      ]
+    },
+    "index": 1,
+    "seed": 24,
+    "step": 13,
+    "targets": [
+      4
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Twin Hormone - Pest",
+        "Viviparous Hormone",
+        "Slender-Limb Powder - Pest"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 7,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 144,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 104,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 104,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Spinal Solution - Aemberon",
+        "Leptomeningeal Solution",
+        "Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 7,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 144,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 104,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 104,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 1,
+    "step": 14,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Slender-Limb Powder - Pest",
+        "Digestive Enzyme Solution",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 8,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 176,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 112,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 68,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 84,
+          "rarity": "normal"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 120,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Twin Hormone - Pest",
+        "Viviparous Hormone",
+        "Slender-Limb Powder - Pest"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 7,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 144,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "boneSentry",
+          "quantity": 104,
+          "rarity": "rare"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 44,
+          "rarity": "normal"
+        },
+        null,
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 104,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": 0,
+    "seed": 2092,
+    "step": 15,
+    "targets": [
+      1
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Slender-Limb Powder - Bone Sentry",
+        "Viscous Bile Solution",
+        "Slough Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 9,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 371,
+          "archetype": "boneSentry",
+          "quantity": 192,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 128,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 92,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 116,
+          "rarity": "normal"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 160,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Slender-Limb Powder - Pest",
+        "Digestive Enzyme Solution",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 8,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 310,
+          "archetype": "boneSentry",
+          "quantity": 176,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 112,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 68,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 84,
+          "rarity": "normal"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 120,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": 1,
+    "seed": 976,
+    "step": 16,
+    "targets": [
+      0
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Spinal Solution - Agito",
+        "Twin Hormone - Pest",
+        "Spinal Solution - Aemberon"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 376,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 168,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 132,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 140,
+          "rarity": "normal"
+        },
+        null,
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Slender-Limb Powder - Bone Sentry",
+        "Viscous Bile Solution",
+        "Slough Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 9,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 371,
+          "archetype": "boneSentry",
+          "quantity": 192,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 128,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 92,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 116,
+          "rarity": "normal"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 160,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 85,
+    "step": 17,
+    "targets": [
+      0,
+      4
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Cyst Rupture Therapy",
+        "Laser Amputation",
+        "Immunosuppressive Experiment"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 11,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 408,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 200,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 180,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 172,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 92,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Spinal Solution - Agito",
+        "Twin Hormone - Pest",
+        "Spinal Solution - Aemberon"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 376,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 168,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 132,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 140,
+          "rarity": "normal"
+        },
+        null,
+        null
+      ]
+    },
+    "index": 1,
+    "seed": 1677,
+    "step": 18,
+    "targets": [
+      1
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Muscle Relaxant Injection Experiment",
+        "Trepanation",
+        "Live Leech Therapy"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 12,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 456,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 224,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 228,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 228,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 116,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Cyst Rupture Therapy",
+        "Laser Amputation",
+        "Immunosuppressive Experiment"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 11,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 408,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 200,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 180,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 172,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 92,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": null,
+    "seed": 833,
+    "step": 19,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Holistic Acupuncture Therapy",
+        "Laparolithotomy",
+        "Anesthesia Analgesia"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 13,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 512,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 248,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 276,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 252,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 164,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "before": {
+      "hand": [
+        "Muscle Relaxant Injection Experiment",
+        "Trepanation",
+        "Live Leech Therapy"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 12,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 475,
+          "archetype": "pest",
+          "quantity": 456,
+          "rarity": "magic"
+        },
+        {
+          "activity": 104,
+          "archetype": "pest",
+          "quantity": 224,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 228,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 228,
+          "rarity": "normal"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 116,
+          "rarity": "normal"
+        },
+        null
+      ]
+    },
+    "index": null,
+    "seed": 207,
+    "step": 20,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Green Bile Solution",
+        "Brain Fog Tincture",
+        "Spinal Solution - Agito"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 2,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 5,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 6,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Mutagenic Powder",
+        "Digestive Enzyme Solution",
+        "Xeno-Hormone"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 1,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 5,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 5,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        null,
+        null,
+        null
+      ]
+    },
+    "index": 2,
+    "seed": 28277,
+    "step": 24,
+    "targets": [
+      0
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Xeno-Hormone",
+        "Slender-Limb Powder - Bone Sentry",
+        "Xenopurge Powder"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 3,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 5,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Green Bile Solution",
+        "Brain Fog Tincture",
+        "Spinal Solution - Agito"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 2,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 5,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 6,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 1,
+    "seed": 4,
+    "step": 25,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Petrified Spinal Solution",
+        "Cleansing Ointment",
+        "Leptomeningeal Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "aemberon",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Xeno-Hormone",
+        "Slender-Limb Powder - Bone Sentry",
+        "Xenopurge Powder"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 3,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 5,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "agito",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 0,
+    "seed": 21,
+    "step": 26,
+    "targets": [
+      1,
+      3
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Compound Leech Solution",
+        "Twin Hormone - Pest",
+        "Viscous Bile Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "aemberon",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Petrified Spinal Solution",
+        "Cleansing Ointment",
+        "Leptomeningeal Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 3,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "aemberon",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 27,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Eggshell Powder",
+        "Twin Hormone - Pest",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Compound Leech Solution",
+        "Twin Hormone - Pest",
+        "Viscous Bile Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 4,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 1,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 6,
+          "archetype": "aemberon",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 2,
+    "seed": 1,
+    "step": 28,
+    "targets": [
+      2
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Cleansing Ointment",
+        "Osteogenic Powder",
+        "Targeted Xeno-Hormone"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Eggshell Powder",
+        "Twin Hormone - Pest",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 2,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 29,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Canine Teeth File",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "instrument",
+      "potionRefreshes": 0,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 5,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 81,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Cleansing Ointment",
+        "Osteogenic Powder",
+        "Targeted Xeno-Hormone"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1
+      ],
+      "instruments": [
+        "Incubation Sac"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 5,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 36,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 24,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 36,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 2,
+    "seed": 7,
+    "step": 30,
+    "targets": [
+      0
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Vivigenic Powder",
+        "Petrified Spinal Solution",
+        "Anesthetic Tincture - Agito"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 7,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 25,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 30,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 52,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 57,
+          "archetype": "pest",
+          "quantity": 133,
+          "rarity": "rare"
+        },
+        {
+          "activity": 30,
+          "archetype": "boneSentry",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 67,
+          "archetype": "pest",
+          "quantity": 133,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Mutagenic Powder",
+        "Spinal Solution - Agito",
+        "Digestive Enzyme Solution"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 6,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 5,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 10,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 32,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 37,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 10,
+          "archetype": "boneSentry",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 47,
+          "archetype": "boneSentry",
+          "quantity": 81,
+          "rarity": "normal"
+        }
+      ]
+    },
+    "index": 0,
+    "seed": 7,
+    "step": 32,
+    "targets": [
+      3,
+      5
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Pure Leech Solution",
+        "Hollow Spinal Solution",
+        "Slender-Limb Powder - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 9,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 65,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 70,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 92,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 157,
+          "archetype": "aemberon",
+          "quantity": 133,
+          "rarity": "magic"
+        },
+        null,
+        {
+          "activity": 168,
+          "archetype": "pest",
+          "quantity": 133,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Digestive Enzyme Solution",
+        "Plague Quarter Peat Poultice",
+        "Potion Kit (Large)"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 8,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 45,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 50,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 72,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 137,
+          "archetype": "aemberon",
+          "quantity": 133,
+          "rarity": "magic"
+        },
+        {
+          "activity": 50,
+          "archetype": "boneSentry",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 87,
+          "archetype": "pest",
+          "quantity": 133,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": 0,
+    "seed": 1,
+    "step": 35,
+    "targets": [
+      5
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Brain Fog Tincture",
+        "Leptomeningeal Solution",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Pure Leech Solution",
+        "Hollow Spinal Solution",
+        "Slender-Limb Powder - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 9,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 65,
+          "archetype": "pest",
+          "quantity": 94,
+          "rarity": "magic"
+        },
+        {
+          "activity": 70,
+          "archetype": "aemberon",
+          "quantity": 69,
+          "rarity": "magic"
+        },
+        {
+          "activity": 92,
+          "archetype": "pest",
+          "quantity": 81,
+          "rarity": "normal"
+        },
+        {
+          "activity": 157,
+          "archetype": "aemberon",
+          "quantity": 133,
+          "rarity": "magic"
+        },
+        null,
+        {
+          "activity": 168,
+          "archetype": "pest",
+          "quantity": 133,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": 2,
+    "seed": 7,
+    "step": 36,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Pure Leech Solution",
+        "Twin Hormone - Pest",
+        "Rare Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Brain Fog Tincture",
+        "Leptomeningeal Solution",
+        "Twin Hormone - Bone Sentry"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 1,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 37,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Green Bile Solution",
+        "Twin Hormone - Pest",
+        "Purest Holy Water"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Pure Leech Solution",
+        "Twin Hormone - Pest",
+        "Rare Potion Kit (Small)"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": 2,
+    "seed": 1,
+    "step": 38,
+    "targets": []
+  },
+  {
+    "after": {
+      "hand": [
+        "Holistic Acupuncture Therapy",
+        "Laser Amputation",
+        "Muscle Relaxant Injection Experiment"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 11,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 105,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 110,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 132,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 258,
+          "archetype": "aemberon",
+          "quantity": 208,
+          "rarity": "magic"
+        },
+        {
+          "activity": 72,
+          "archetype": "pest",
+          "quantity": 154,
+          "rarity": "magic"
+        },
+        {
+          "activity": 238,
+          "archetype": "pest",
+          "quantity": 208,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Green Bile Solution",
+        "Twin Hormone - Pest",
+        "Purest Holy Water"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "potion",
+      "potionRefreshes": 0,
+      "round": 10,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 85,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 90,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 192,
+          "archetype": "aemberon",
+          "quantity": 193,
+          "rarity": "magic"
+        },
+        {
+          "activity": 21,
+          "archetype": "boneSentry",
+          "quantity": 154,
+          "rarity": "normal"
+        },
+        {
+          "activity": 203,
+          "archetype": "pest",
+          "quantity": 193,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": 0,
+    "seed": 12,
+    "step": 39,
+    "targets": [
+      3,
+      4
+    ]
+  },
+  {
+    "after": {
+      "hand": [
+        "Yellow Bile Therapy",
+        "Laparolithotomy",
+        "Trepanation"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 13,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 145,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 150,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 172,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 328,
+          "archetype": "aemberon",
+          "quantity": 238,
+          "rarity": "magic"
+        },
+        {
+          "activity": 112,
+          "archetype": "pest",
+          "quantity": 154,
+          "rarity": "magic"
+        },
+        {
+          "activity": 308,
+          "archetype": "pest",
+          "quantity": 238,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "before": {
+      "hand": [
+        "Holistic Acupuncture Therapy",
+        "Laser Amputation",
+        "Muscle Relaxant Injection Experiment"
+      ],
+      "instrumentRefreshes": 0,
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "phase": "protocol",
+      "potionRefreshes": 0,
+      "round": 11,
+      "shelley": 3,
+      "tanks": [
+        {
+          "activity": 105,
+          "archetype": "pest",
+          "quantity": 139,
+          "rarity": "magic"
+        },
+        {
+          "activity": 110,
+          "archetype": "aemberon",
+          "quantity": 114,
+          "rarity": "magic"
+        },
+        {
+          "activity": 132,
+          "archetype": "pest",
+          "quantity": 126,
+          "rarity": "normal"
+        },
+        {
+          "activity": 258,
+          "archetype": "aemberon",
+          "quantity": 208,
+          "rarity": "magic"
+        },
+        {
+          "activity": 72,
+          "archetype": "pest",
+          "quantity": 154,
+          "rarity": "magic"
+        },
+        {
+          "activity": 238,
+          "archetype": "pest",
+          "quantity": 208,
+          "rarity": "rare"
+        }
+      ]
+    },
+    "index": null,
+    "seed": 1,
+    "step": 40,
+    "targets": []
+  },
+  {
+    "step": "final-289996",
+    "before": {
+      "tanks": [
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 475,
+          "quantity": 512
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 104,
+          "quantity": 248
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 276
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 252
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 164
+        },
+        null
+      ],
+      "hand": [
+        "Holistic Acupuncture Therapy",
+        "Laparolithotomy",
+        "Anesthesia Analgesia"
+      ],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "phase": "protocol",
+      "round": 13,
+      "potionRefreshes": 0,
+      "instrumentRefreshes": 0,
+      "shelley": 3
+    },
+    "after": {
+      "tanks": [
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 475,
+          "quantity": 544
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 104,
+          "quantity": 296
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 324
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 300
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 1,
+          "quantity": 188
+        },
+        null
+      ],
+      "hand": [],
+      "instruments": [
+        "Chrysalis Specimen",
+        "Rawhide Restraint",
+        "Rawhide Restraint"
+      ],
+      "instrumentRounds": [
+        1,
+        3,
+        6
+      ],
+      "phase": "protocol",
+      "round": 14,
+      "potionRefreshes": 0,
+      "instrumentRefreshes": 0,
+      "shelley": 3
+    },
+    "index": null,
+    "targets": [],
+    "seed": 1934
+  },
+  {
+    "step": "final-265453",
+    "before": {
+      "tanks": [
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 145,
+          "quantity": 139
+        },
+        {
+          "archetype": "aemberon",
+          "rarity": "magic",
+          "activity": 150,
+          "quantity": 114
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 172,
+          "quantity": 126
+        },
+        {
+          "archetype": "aemberon",
+          "rarity": "magic",
+          "activity": 328,
+          "quantity": 238
+        },
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 112,
+          "quantity": 154
+        },
+        {
+          "archetype": "pest",
+          "rarity": "rare",
+          "activity": 308,
+          "quantity": 238
+        }
+      ],
+      "hand": [
+        "Yellow Bile Therapy",
+        "Laparolithotomy",
+        "Trepanation"
+      ],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "phase": "protocol",
+      "round": 13,
+      "potionRefreshes": 0,
+      "instrumentRefreshes": 0,
+      "shelley": 3
+    },
+    "after": {
+      "tanks": [
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 165,
+          "quantity": 139
+        },
+        {
+          "archetype": "aemberon",
+          "rarity": "magic",
+          "activity": 170,
+          "quantity": 114
+        },
+        {
+          "archetype": "pest",
+          "rarity": "normal",
+          "activity": 192,
+          "quantity": 126
+        },
+        {
+          "archetype": "aemberon",
+          "rarity": "magic",
+          "activity": 363,
+          "quantity": 253
+        },
+        {
+          "archetype": "pest",
+          "rarity": "magic",
+          "activity": 132,
+          "quantity": 154
+        },
+        {
+          "archetype": "pest",
+          "rarity": "rare",
+          "activity": 343,
+          "quantity": 253
+        }
+      ],
+      "hand": [],
+      "instruments": [
+        "Incubation Sac",
+        "Tanned Leather Restraint",
+        "Pig Iron Bone Saw"
+      ],
+      "instrumentRounds": [
+        1,
+        6,
+        8
+      ],
+      "phase": "protocol",
+      "round": 14,
+      "potionRefreshes": 0,
+      "instrumentRefreshes": 0,
+      "shelley": 3
+    },
+    "index": null,
+    "targets": [],
+    "seed": 1
+  }
+]

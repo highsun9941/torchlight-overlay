@@ -14,7 +14,8 @@ use vorax::value::{board_value, build_progress};
 /// The recorded traces were made with tli-vorax-simulator's linear board value (7b4c9ba), not the trees the program
 /// ships: every test plays with that one.
 fn linear_board_value() {
-    let _ = vorax::data::use_model(Some(include_str!("../../../fixtures/boardValue-linear.json")));
+    let _ = vorax::data::use_reference_model(include_str!("../../../fixtures/boardValue-linear.json"));
+    assert!(vorax::data().reference_rules);
     assert!(matches!(vorax::data().model, Some(vorax::data::ValueModel::Rounds { .. })), "the tests need the linear board value");
 }
 
@@ -213,13 +214,13 @@ fn strategy_matches() {
             let theirs: Vec<Opt> = c["options"].as_array().unwrap().iter().map(ts_opt).collect();
             assert_eq!(opts.as_slice(), &theirs[..], "board {n} options");
             eq("quick", json!(opts.iter().map(|o| expected(&s, o, &Policy::new(8, 0), seed, 0)).collect::<Vec<_>>()));
-            let deep = Policy { samples: 2, horizon: 2, roll_samples: Some(2), steer: Some(0.3), value: None };
+            let deep = Policy { samples: 2, horizon: 2, roll_samples: Some(2), steer: Some(0.3), value: None, goal: Goal::Target };
             eq("deep", json!(opts.iter().take(3).map(|o| expected(&s, o, &deep, seed, 0)).collect::<Vec<_>>()));
-            let valued = Policy { samples: 2, horizon: 1, roll_samples: None, steer: None, value: Some(true) };
+            let valued = Policy { samples: 2, horizon: 1, roll_samples: None, steer: None, value: Some(true), goal: Goal::Target };
             eq("valued", json!(opts.iter().take(3).map(|o| expected(&s, o, &valued, seed, 0)).collect::<Vec<_>>()));
             eq("changes", json!(opts.iter().map(|o| match o { Opt::Card { index, targets } => card_changes(&s, *index as usize, targets.as_slice()), _ => true }).collect::<Vec<_>>()));
-            let p1 = Policy { samples: 2, horizon: 0, roll_samples: None, steer: None, value: Some(true) };
-            let p2 = Policy { samples: 4, horizon: 0, roll_samples: None, steer: Some(0.3), value: None };
+            let p1 = Policy { samples: 2, horizon: 0, roll_samples: None, steer: None, value: Some(true), goal: Goal::Target };
+            let p2 = Policy { samples: 4, horizon: 0, roll_samples: None, steer: Some(0.3), value: None, goal: Goal::Target };
             for (k, p) in [p1, p2].iter().enumerate() {
                 let ch = choose(&s, p, seed);
                 let ts = &c["choose"][k];
@@ -236,11 +237,11 @@ fn strategy_matches() {
             }
             let o: Vec<Opt> = list.iter().map(|x| x.0).collect();
             eq("futures", tallies(&potion_futures(&s, seed, &la, &o, 0, 2, true)));
-            let steer = LookAhead { top: 4, playouts: 2, steer: Some(0.3), inner_samples: None, value: None, halving: None };
+            let steer = LookAhead { top: 4, playouts: 2, steer: Some(0.3), inner_samples: None, value: None, halving: None, goal: Goal::Target };
             eq("futuresSteer", tallies(&potion_futures(&s, seed, &steer, &o[..2.min(o.len())], 3, 4, false)));
         } else {
             let choices: Vec<Pick> = c["choices"].as_array().unwrap().iter().map(|x| if x == "refresh" { Pick::Refresh } else { Pick::Card(x.as_u64().unwrap() as usize) }).collect();
-            let value = Chooser::Ev(Policy { samples: 4, horizon: 0, roll_samples: None, steer: None, value: Some(true) });
+            let value = Chooser::Ev(Policy { samples: 4, horizon: 0, roll_samples: None, steer: None, value: Some(true), goal: Goal::Target });
             eq("futures", tallies(&instrument_futures(&s, seed, &choices, &value, Goal::Target, 0, 2, true)));
             let plain = Chooser::Ev(Policy::new(2, 0));
             eq("futuresPlain", tallies(&instrument_futures(&s, seed, &choices, &plain, Goal::Target, 1, 3, false)));
@@ -272,9 +273,9 @@ fn whole_games_match() {
     for c in lines("games.jsonl") {
         let seed = c["seed"].as_u64().unwrap() as u32;
         let end = if c["chooser"] == "value" {
-            run_game(seed, &Chooser::Ev(Policy { samples: 2, horizon: 0, roll_samples: None, steer: None, value: Some(true) }), &Picker::Value, None)
+            run_game(seed, &Chooser::Ev(Policy { samples: 2, horizon: 0, roll_samples: None, steer: None, value: Some(true), goal: Goal::Target }), &Picker::Value, None)
         } else {
-            run_game(seed, &Chooser::Ev(Policy { samples: 4, horizon: 0, roll_samples: None, steer: Some(0.3), value: None }), &Picker::Value, None)
+            run_game(seed, &Chooser::Ev(Policy { samples: 4, horizon: 0, roll_samples: None, steer: Some(0.3), value: None, goal: Goal::Target }), &Picker::Value, None)
         };
         let mine = snap(&end);
         assert!(same(&mine, &c["final"]), "game seed {seed} {}:\n    {}", c["chooser"], diff(&mine, &c["final"]));
