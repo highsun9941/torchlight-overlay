@@ -472,8 +472,11 @@ mod tests {
         use super::{Pipeline, ScreenPhase};
         use vorax_scan::reading::FieldRead;
 
-        let frame = super::Img::new(1, 1);
+        let frame = super::decode_png(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/frames/board-1080p.png"),
+        ).unwrap();
         let mut reading = super::scan(&frame, super::scan_data(), false);
+        reading.state = vorax_scan::reading::empty_state();
         let mut pipeline = Pipeline::new(3);
         reading.state.phase = ScreenPhase::Instrument;
         reading.fields.insert("refreshes".into(), FieldRead::sure(true));
