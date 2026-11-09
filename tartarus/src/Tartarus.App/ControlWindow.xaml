@@ -245,7 +245,7 @@
           </StackPanel>
           <TextBlock x:Name="VoraxStatus" Text="대기" TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,12,0,0" />
           <TextBlock Style="{StaticResource Section}" Text="표시 읽는 방법" />
-          <TextBlock Text="밝은 테두리: 추천 카드와 배양 탱크.&#10;파란 테두리: 인식 확인이 필요한 카드·탱크·숫자 영역.&#10;84만 달성률: 현재 상태에서 시뮬레이션한 결과이며 성공 보장은 아닙니다.&#10;11~13라운드 수술 플랜: 전투 난이도와 보상을 직접 판단합니다." TextWrapping="Wrap" LineHeight="23" />
+          <TextBlock Text="밝은 테두리: 추천 카드와 배양 탱크.&#10;파란 테두리: 인식 확인이 필요한 카드·탱크·숫자 영역.&#10;예상 최종 활성은 현재 라운드부터 13라운드 종료까지 시뮬레이션한 평균입니다.&#10;11~13라운드 수술 플랜: 전투 난이도와 보상을 직접 판단합니다." TextWrapping="Wrap" LineHeight="23" />
           <TextBlock Style="{StaticResource Section}" Text="단축키" />
           <TextBlock Text="Ctrl+Alt+X  다시 인식&#10;Ctrl+Alt+V  오버레이 숨김 / 표시" Foreground="#C4D4DE" LineHeight="23" />
           <TextBlock Text="자동 인식에는 게임 설정의 로그 활성화가 필요합니다. 창 모드 또는 테두리 없는 창 모드를 사용하세요." TextWrapping="Wrap" Foreground="#97A9BF" Margin="0,20,0,0" />

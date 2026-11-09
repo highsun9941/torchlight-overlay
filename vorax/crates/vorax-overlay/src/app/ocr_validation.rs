@@ -20,6 +20,7 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
         ("reported/hover-before.png","instrument","Adherent Metatarsals"),
         ("title-motion/tooltip.png","potion","Green Bile Solution"),
         ("round-memory/normal-tooltip.png","potion","Twin Hormone - Pest"),
+        ("osteogenic-tooltip/popup.png","potion","Osteogenic Powder"),
     ] {
         let frame=load(root,file)?;
         let source=if expected=="Pig Iron Bone Saw" {

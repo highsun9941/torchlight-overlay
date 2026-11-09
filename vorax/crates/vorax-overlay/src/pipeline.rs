@@ -954,7 +954,9 @@ mod tests {
         use super::*;
         let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/frames/board-1080p.png")).unwrap();
         let mut pipe = Pipeline::new(0);
-        let Outcome::Advice { advice: first, cached: false, .. } = pipe.run(&frame, None, None) else { panic!("first calculation") };
+        let Outcome::Advice { advice: first, plan, cached: false, .. } = pipe.run(&frame, None, None) else { panic!("first calculation") };
+        assert_eq!(first.goal, vorax::bot::Goal::Mean);
+        assert!(plan.pill.is_some_and(|pill| pill.sub.starts_with("예상 최종 활성 ")));
         let Outcome::Advice { advice: second, cached: true, .. } = pipe.run(&frame, None, None) else { panic!("cached calculation") };
         assert_eq!(first.best, second.best);
         assert_eq!(first.ranking, second.ranking);
@@ -1272,6 +1274,39 @@ mod tests {
         assert!(vorax_scan::hover::recognize(&frame,"potion",&[],&mut generic).is_err());
         let mut damaged=|_:&Img|"푸른 {』'言 용액".to_string();
         assert!(vorax_scan::hover::recognize(&frame,"potion",&[("Osteogenic Powder".into(),0.99)],&mut damaged).is_err());
+    }
+
+    #[test]
+    fn dim_blue_osteogenic_popup_recovers_with_exact_heading_and_source_art() {
+        use super::*;
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/osteogenic-tooltip/popup.png");
+        let attached = decode_png(&path).unwrap();
+        let resized = vorax_scan::pixels::resize(&attached, 2233, 958);
+        let source = vec![("Osteogenic Powder".into(), 0.984), ("Eggshell Powder".into(), 0.983)];
+        let candidates = [(0, source.clone()), (1, vec![("Xeno-Hormone".into(), 1.0)])];
+        let mut needed_smaller_art = false;
+        for frame in [&attached, &resized] {
+            let search = vorax_scan::hover::inspect_tooltip(frame);
+            assert_eq!(search.method, Some("dim_blue_edges"), "{search:?}");
+            let tip = search.tooltip.unwrap();
+            let center = vorax_scan::layout::CardPos { cx: tip.center.x, cy: tip.center.y, angle: 0.0 };
+            let art = vorax_scan::cards::rank_card_art(frame, &center, tip.scale, "potion", scan_data());
+            let standard_score = art.iter().find(|(name, _)| name == "Osteogenic Powder").unwrap().1;
+
+            let mut exact = |_: &Img| "생골 가루약".to_owned();
+            let read = vorax_scan::hover::recognize(frame, "potion", &source, &mut exact).unwrap();
+            assert_eq!(read.name, "Osteogenic Powder");
+            assert!(read.art_score >= 0.92);
+            assert_eq!(vorax_scan::hover::target(&read.name, &candidates, None), Some(0));
+            assert!(vorax_scan::hover::recognize(frame, "potion", &source[1..], &mut exact).is_err());
+
+            if standard_score < 0.92 {
+                needed_smaller_art = true;
+                let mut incomplete = |_: &Img| "생골 가루".to_owned();
+                assert!(vorax_scan::hover::recognize(frame, "potion", &source, &mut incomplete).is_err());
+            }
+        }
+        assert!(needed_smaller_art, "at least one rendering must exercise artwork refinement");
     }
 
     #[test]

@@ -52,6 +52,10 @@ pub struct TooltipSearch {
 /// Blue glow is broken by the background and need not form a connected component. Fit both long
 /// sides and independently verify top and bottom; lowering a global colour threshold joins scenery.
 pub fn inspect_tooltip(img:&Img)->TooltipSearch {
+    search_tooltip(img, false)
+}
+
+fn search_tooltip(img: &Img, monster: bool) -> TooltipSearch {
     let k=img.height as f64/1440.0;
     let make=|r:Rect|Tooltip{rect:r,center:CardPosData{x:r.x+r.w/2.0,y:r.y+r.h/2.0},scale:(r.h-12.0*k)/340.0};
     // Gold glow can connect to the illustration or split along the left edge. Fit the four
@@ -62,20 +66,26 @@ pub fn inspect_tooltip(img:&Img)->TooltipSearch {
     let blue=fit_edges(img,BorderColor::Blue);
     if blue.tooltip.is_some() {return blue;}
     let neutral=fit_edges(img,BorderColor::Neutral);
-    if neutral.tooltip.is_some() {neutral} else {blue}
+    if neutral.tooltip.is_some() {return neutral;}
+    // A dimmed or resampled blue rim can lose brightness along its horizontal edges.
+    // For cards, require a plausible pair of sides in the strict blue mask first.
+    if monster || blue.blue_pairs > 0 {
+        let mut dim = fit_edges(img, BorderColor::DimBlue);
+        if monster && dim.tooltip.is_some() { dim.method = Some("monster_blue_edges"); }
+        if dim.tooltip.is_some() || monster {return dim;}
+    }
+    blue
 }
 
 /// Normal potions have a dim grey frame. Fit all four edges independently, using the same
 /// size/aspect checks as the blue frame; scenery colour alone never identifies a card.
 #[derive(Clone,Copy)]
-enum BorderColor {Blue,Neutral,Gold,Monster}
+enum BorderColor {Blue,Neutral,Gold,DimBlue}
 
-/// Monster tooltips have a dimmer cyan top rim than offered cards. Keep this alternate
-/// photometric threshold separate from card recognition; four fitted edges and the monster
-/// footer, three numeric fields and product are still required by tank_hover.
+/// Monster tooltips can use the dim blue mask without a strict pair of sides. Their
+/// footer and numeric values are verified separately by the tank reader.
 pub fn inspect_monster_tooltip(img:&Img)->TooltipSearch {
-    let ordinary=inspect_tooltip(img);
-    if ordinary.tooltip.is_some() {ordinary} else {fit_edges(img,BorderColor::Monster)}
+    search_tooltip(img, true)
 }
 fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
     let k=img.height as f64/1440.0;
@@ -89,7 +99,7 @@ fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
         mask[y*w+x]=match color {
             BorderColor::Neutral=>r.min(g).min(b)>=60 && r.max(g).max(b)-r.min(g).min(b)<=48,
             BorderColor::Blue=>b>=115 && g>=60 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
-            BorderColor::Monster=>b>=95 && g>=50 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
+            BorderColor::DimBlue=>b>=95 && g>=50 && b as i32-r as i32>=40 && b as i32-g as i32>=25,
             // Scaling blends the thin rim with its dark neighbours. Keep its warm hue and
             // require four independent edges instead of relying on a high absolute brightness.
             BorderColor::Gold=>r>130 && g>70 && b<155 && r as i32-g as i32>=25 && g as i32-b as i32>=15,
@@ -140,7 +150,7 @@ fn fit_edges(img:&Img,color:BorderColor)->TooltipSearch {
             || ((lb-lt+1).min(rb-rt+1) as f64)<height*0.6 {continue;}
         result.blue_pairs+=1;result.edge_score=result.edge_score.max(ts.min(bs));
         if ts>=0.7 && bs>=0.7 && ts+bs+ls+rs>rank {
-            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some(match color {BorderColor::Neutral=>"neutral_edges",BorderColor::Blue=>"blue_edges",BorderColor::Gold=>"gold_edges",BorderColor::Monster=>"monster_blue_edges"});
+            rank=ts+bs+ls+rs;result.tooltip=Some(make(Rect::new(lx as f64,top,width,height)));result.method=Some(match color {BorderColor::Neutral=>"neutral_edges",BorderColor::Blue=>"blue_edges",BorderColor::Gold=>"gold_edges",BorderColor::DimBlue=>"dim_blue_edges"});
         }
     }}
     result
@@ -199,6 +209,15 @@ fn short_title_names<'a>(names:&'a [String],text:&str)->Vec<&'a str> {
     }).map(String::as_str).collect()
 }
 
+fn exact_korean_heading(name: &str, text: &str) -> bool {
+    let title = crate::korean::name(name);
+    title.chars().any(crate::korean::hangul)
+        && text.lines().any(|line| {
+            line.chars().filter(|c| c.is_alphanumeric())
+                .eq(title.chars().filter(|c| c.is_alphanumeric()))
+        })
+}
+
 pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn FnMut(&Img)->String)->Result<HoverRead,HoverFailure> {
     let tip=tooltip(img).ok_or_else(||HoverFailure{stage:"tooltip_missing".into(),texts:vec![],art:vec![],tooltip:None,title_area:None,title_ranks:vec![],fragments:vec![]})?;
     let mut texts=Vec::new();
@@ -218,12 +237,18 @@ pub fn recognize(img:&Img, phase:&str, original:&[(String,f64)], read:&mut dyn F
         ranks.sort_by(|a,b|b.1.total_cmp(&a.1));
         let Some((name,q))=ranks.first() else {continue;};
         title_ranks=ranks.iter().take(3).map(|(n,q)|((*n).clone(),*q)).collect();
-        let score=art.iter().find(|(n,_)|n==*name).map_or(0.0,|x|x.1);
+        let mut score=art.iter().find(|(n,_)|n==*name).map_or(0.0,|x|x.1);
         let supported=original.is_empty() || original.iter().all(|(_,s)|*s<0.90) || original.iter().any(|(n,s)|n==*name&&*s>=0.90);
-        if *q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0 && score>=0.92 && supported && crate::family::verified(name,&text,names) {
-            return Ok(HoverRead {name:(*name).clone(),text,title_score:*q,art_score:score,tooltip:tip,title_area,match_kind:"complete_title".into()});
+        let complete = *q >= 6.0 && *q - ranks.get(1).map_or(f64::NEG_INFINITY, |x| x.1) >= 3.0;
+        if complete && supported && crate::family::verified(name, &text, names) {
+            if (0.90..0.92).contains(&score) && exact_korean_heading(name, &texts[0]) {
+                score = score.max(crate::cards::smaller_popup_art_score(img, &c, tip.scale, phase, name, data));
+            }
+            if score >= 0.92 {
+                return Ok(HoverRead {name:(*name).clone(),text,title_score:*q,art_score:score,tooltip:tip,title_area,match_kind:"complete_title".into()});
+            }
         }
-        if !(*q>=6.0 && *q-ranks.get(1).map_or(f64::NEG_INFINITY,|x|x.1)>=3.0) {
+        if !complete {
             let partial=fragment_names(names.iter().map(|n|(n.as_str(),crate::korean::name(n))),&text);
             fragments=partial.iter().map(|s|s.to_string()).collect();
             if let [name]=partial.as_slice() {

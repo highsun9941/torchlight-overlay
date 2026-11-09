@@ -1,9 +1,10 @@
 //! What the overlay draws, and drawing it: an outline on the card (or reroll) to take, a glowing outline on the
-//! glass of each tank to target, and one small pill with the move and how often it reaches 840k. Pure drawing into an RGBA
+//! glass of each tank to target, and one small pill with the move and its projected final activity. Pure drawing into an RGBA
 //! picture, so it can be previewed on a saved frame without the game.
 
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
-use vorax::advisor::{Advice, Best, ScreenPhase, ScreenState};
+use vorax::advisor::{Advice, Best, End, ScreenPhase, ScreenState};
+use vorax::bot::Goal;
 use vorax_scan::layout::{CardPos, Layout};
 use vorax_scan::pixels::Rect;
 use vorax_scan::reading::{Problem, Reading};
@@ -16,7 +17,7 @@ const CARD_H: f64 = 340.0;
 pub struct Pill {
     /// the move: a card's name, with its tanks
     pub main: String,
-    /// how it ends: "64% reach 840k"
+    /// The simulation estimate or guidance for this choice.
     pub sub: String,
     /// the board is being read or worked out: the last advice, dimmed
     pub dim: bool,
@@ -52,8 +53,11 @@ impl Plan {
     }
 }
 
-fn pct(x: f64) -> String {
-    format!("84만 달성 예상 {:.0}% / 시뮬레이션", x * 100.0)
+fn outcome_summary(goal: Goal, end: End) -> String {
+    match goal {
+        Goal::Mean => format!("예상 최종 활성 {:.0}", end.activity),
+        Goal::Target => format!("84만 달성 예상 {:.0}% / 시뮬레이션", end.reached * 100.0),
+    }
 }
 
 /// The hand positions the reading's names came from: unknown cards are left out of its hand.
@@ -80,7 +84,7 @@ pub fn plan_for(advice: &Advice, screen: &ScreenState, reading: &Reading, l: &La
         Best::Refresh => {
             let r = l.refresh;
             plan.button = Some(Rect::new(r.x - 0.35 * r.w, r.y - 0.45 * r.h, r.w * 1.7, r.h * 1.9));
-            let sub = advice.refresh_end.map(|e| pct(e.reached)).unwrap_or_default();
+            let sub = advice.refresh_end.map(|e| outcome_summary(advice.goal, e)).unwrap_or_default();
             plan.pill = Some(Pill { main: "새로고침".into(), sub, dim: false });
         }
         Best::Card(r) => {
@@ -99,7 +103,7 @@ pub fn plan_for(advice: &Advice, screen: &ScreenState, reading: &Reading, l: &La
             };
             let sub = match (&advice.note, r.end) {
                 (Some(_), _) => "특수 포션 우선 규칙 / 확률 계산 대상 외".into(),
-                (None, Some(e)) => pct(e.reached),
+                (None, Some(e)) => outcome_summary(advice.goal, e),
                 (None, None) => String::new(),
             };
             plan.pill = Some(Pill { main, sub, dim: false });
