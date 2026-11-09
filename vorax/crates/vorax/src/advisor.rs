@@ -229,9 +229,14 @@ pub enum Prepared {
     Work { work: Work, x: ScreenState, unknown: Vec<String>, t0: Instant },
 }
 
+/// Live advice maximizes average final activity. The reference replay uses the recorded objective.
+pub fn default_goal() -> Goal {
+    if data().reference_rules { Goal::Target } else { Goal::Mean }
+}
+
 /// Immediate advice for a protocol or special potion, or the futures to play for other choices.
 pub fn prepare(x: &ScreenState, futures: Option<u32>) -> Prepared {
-    prepare_for_goal(x, futures, Goal::Target)
+    prepare_for_goal(x, futures, default_goal())
 }
 
 pub fn prepare_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal) -> Prepared {
@@ -406,7 +411,7 @@ pub fn advise_plan(x: &ScreenState, futures: Option<u32>, par: bool) -> Advice {
 /// `advise_plan`, the potions' futures spread by successive halving when `halving` (`halved_futures`): the same
 /// futures on average, most of them on the close calls between the best options.
 pub fn advise_halved(x: &ScreenState, futures: Option<u32>, halving: bool, par: bool) -> Advice {
-    advise_for_goal(x, futures, Goal::Target, halving, par)
+    advise_for_goal(x, futures, default_goal(), halving, par)
 }
 
 pub fn advise_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal, halving: bool, par: bool) -> Advice {
@@ -433,7 +438,7 @@ pub fn advise(x: &ScreenState, samples: u32, plan: bool, par: bool) -> Advice {
     }
     let t0 = Instant::now();
     if x.hand.iter().any(|n| is_always_take(n)) {
-        if let Prepared::Done(a) = prepare(x, None) {
+        if let Prepared::Done(a) = prepare_for_goal(x, None, Goal::Target) {
             return a;
         }
     }

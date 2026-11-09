@@ -954,7 +954,9 @@ mod tests {
         use super::*;
         let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/frames/board-1080p.png")).unwrap();
         let mut pipe = Pipeline::new(0);
-        let Outcome::Advice { advice: first, cached: false, .. } = pipe.run(&frame, None, None) else { panic!("first calculation") };
+        let Outcome::Advice { advice: first, plan, cached: false, .. } = pipe.run(&frame, None, None) else { panic!("first calculation") };
+        assert_eq!(first.goal, vorax::bot::Goal::Mean);
+        assert!(plan.pill.is_some_and(|pill| pill.sub.starts_with("예상 최종 활성 ")));
         let Outcome::Advice { advice: second, cached: true, .. } = pipe.run(&frame, None, None) else { panic!("cached calculation") };
         assert_eq!(first.best, second.best);
         assert_eq!(first.ranking, second.ranking);

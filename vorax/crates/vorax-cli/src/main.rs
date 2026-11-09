@@ -14,6 +14,7 @@
 //! Data: what the build embedded (data/). --model <model.json|none> on any command uses another board value
 //! (none: boards judged by their score); for train, it's the board value the training games are played by.
 //! --potion-refreshes N and --instrument-refreshes N set the starting rerolls for simulation/training (0..9).
+//! Planned advice and the solver simulation default to maximizing average final activity.
 
 use std::io::Read;
 use std::path::PathBuf;
@@ -86,10 +87,11 @@ fn info() {
 }
 
 fn goal(args: &[String]) -> Goal {
-    match arg::<String>(args, "--goal").as_deref().unwrap_or("target") {
-        "target" => Goal::Target,
-        "mean" => Goal::Mean,
-        _ => fail("--goal must be target or mean"),
+    match arg::<String>(args, "--goal").as_deref() {
+        None => advisor::default_goal(),
+        Some("target") => Goal::Target,
+        Some("mean") => Goal::Mean,
+        Some(_) => fail("--goal must be target or mean"),
     }
 }
 

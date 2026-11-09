@@ -11,6 +11,54 @@ fn screen(phase: ScreenPhase, hand: Vec<String>) -> ScreenState {
 }
 
 #[test]
+fn live_potion_advice_keeps_scoring_through_round_thirteen() {
+    let mut x = screen(ScreenPhase::Potion, vec![
+        "Osteolytic Ointment".into(),
+        "Leptomeningeal Solution".into(),
+    ]);
+    x.round = Some(10);
+    x.potion_refreshes = Some(0);
+    x.tanks[0] = Some(advisor::ScreenMonster {
+        archetype: Archetype::BoneSentry, rarity: Rarity::Rare, activity: 1000, quantity: 1000,
+    });
+    x.tanks[1] = Some(advisor::ScreenMonster {
+        archetype: Archetype::Pest, rarity: Rarity::Normal, activity: 1000, quantity: 1000,
+    });
+    x.instruments = vec!["Pig Iron Bone Saw".into(), "Incubation Sac".into(), "Vermicular Spinal Cord".into()];
+
+    let live = advisor::advise_plan(&x, Some(4), false);
+    assert_eq!(live.goal, Goal::Mean);
+    assert_eq!(live.board, 2_000_000);
+    let Best::Card(best) = live.best else { panic!("expected a potion") };
+    assert_eq!(best.index, 1);
+    // The saw adds 15 to both factors in each of rounds 10, 11, 12 and 13.
+    assert_eq!(best.end.unwrap().activity, 2_279_000.0);
+
+    let capped = advisor::advise_for_goal(&x, Some(4), Goal::Target, false, false);
+    assert!(matches!(capped.best, Best::Card(card) if card.index == 0));
+}
+
+#[test]
+fn live_reward_tool_advice_uses_the_remaining_round() {
+    let mut x = screen(ScreenPhase::Instrument, vec![
+        "Chrysalis Specimen".into(),
+        "Pig Iron Bone Saw".into(),
+    ]);
+    x.round = Some(12);
+    x.instrument_refreshes = Some(0);
+    x.tanks[0] = Some(advisor::ScreenMonster {
+        archetype: Archetype::Pest, rarity: Rarity::Rare, activity: 2000, quantity: 500,
+    });
+    x.instruments = vec!["Incubation Sac".into(), "Vermicular Spinal Cord".into()];
+
+    let advice = advisor::advise_plan(&x, Some(4), false);
+    assert_eq!(advice.goal, Goal::Mean);
+    let Best::Card(best) = advice.best else { panic!("expected an instrument") };
+    assert_eq!(best.index, 1);
+    assert_eq!(best.end.unwrap().activity, 1_037_725.0);
+}
+
+#[test]
 fn mean_counts_scores_above_target_in_both_kinds_of_futures() {
     let mut s = create_game(data().default_settings, None, Some(1));
     s.phase = Phase::GameOver;
