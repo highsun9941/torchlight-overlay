@@ -1,6 +1,4 @@
-//! The game data (data/game.json, data/boardValue.json): cards, instruments and the odds as of Oct 22, 2026, and the
-//! board value (linear, 656 weights per round: with the Solver's many futures it plays as well as trained trees, and
-//! five times faster). Embedded at build time.
+//! Cards, instruments, odds and the board value, embedded at build time.
 
 use crate::effects;
 use crate::types::{EventType, Rarity, Settings};
@@ -138,6 +136,8 @@ pub struct Data {
     pub box_offer: [f64; 256],
     pub instrument_offer: [f64; 256],
     pub spawn_rarity: [f64; 4],
+    /// Chance of starting with four tanks. The original data deals three or four with equal probability.
+    pub start_four: Option<f64>,
     pub model: Option<ValueModel>,
     /// a tree model's trees packed for walking
     pub forest: Option<Forest>,
@@ -204,14 +204,39 @@ struct RawInstrumentOffer {
     advanced: HashMap<String, f64>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RealOdds {
+    spawn_rarity: RarityWeights,
+    start_four: f64,
+}
+
+#[derive(Deserialize)]
+struct RarityWeights {
+    normal: f64,
+    magic: f64,
+    rare: f64,
+    boss: f64,
+}
+
 /// The game data this build was compiled with (game.json).
 const EMBEDDED_GAME: &str = include_str!("../../../data/game.json");
 const EMBEDDED_VALUE: &str = include_str!("../../../data/boardValue.json");
+const REAL_ODDS: &str = include_str!("../../../data/realOdds.json");
 
 impl Data {
     /// The data this build was compiled with.
     pub fn embedded() -> Result<Data, String> {
-        Data::parse(EMBEDDED_GAME, Some(EMBEDDED_VALUE))
+        Self::embedded_with_model(EMBEDDED_VALUE)
+    }
+
+    fn embedded_with_model(board_value: &str) -> Result<Data, String> {
+        let mut data = Self::parse(EMBEDDED_GAME, Some(board_value))?;
+        let real: RealOdds = serde_json::from_str(REAL_ODDS).map_err(|e| format!("realOdds.json: {e}"))?;
+        let RarityWeights { normal, magic, rare, boss } = real.spawn_rarity;
+        data.spawn_rarity = [normal, magic, rare, boss];
+        data.start_four = Some(real.start_four);
+        Ok(data)
     }
 
     pub fn parse(game: &str, board_value: Option<&str>) -> Result<Data, String> {
@@ -330,6 +355,7 @@ impl Data {
             box_offer,
             instrument_offer,
             spawn_rarity: [spawn("normal"), spawn("magic"), spawn("rare"), spawn("boss")],
+            start_four: None,
             forest: match &model {
                 Some(ValueModel::Trees { base, trees }) => Some(Forest::pack(*base, trees)),
                 _ => None,
@@ -359,7 +385,13 @@ impl Data {
 
     pub fn potion_by_name(&self, name: &str) -> Option<u8> {
         let n = norm(name);
-        self.potions.iter().find(|p| norm(&p.name) == n).map(|p| p.id)
+        // Accept the current card titles alongside the names already emitted by the reader and saved traces.
+        let canonical = match n.as_str() {
+            "fastactingcardiacstimulant" => "fastactinghearttonic",
+            "theholiestwater" => "purestholywater",
+            _ => n.as_str(),
+        };
+        self.potions.iter().find(|p| norm(&p.name) == canonical).map(|p| p.id)
     }
 
     pub fn instrument_by_name(&self, name: &str) -> Option<u8> {
@@ -397,7 +429,7 @@ pub fn use_model(board_value: Option<&str>) -> Result<(), String> {
 
 /// Explicit CLI experiment settings; the overlay uses the observed rerolls instead.
 pub fn configure(board_value: Option<&str>, settings: Option<Settings>) -> Result<(), String> {
-    let mut d = Data::parse(EMBEDDED_GAME, Some(board_value.unwrap_or(EMBEDDED_VALUE)))?;
+    let mut d = Data::embedded_with_model(board_value.unwrap_or(EMBEDDED_VALUE))?;
     if let Some(settings) = settings { d.default_settings = settings; }
     DATA.set(d).map_err(|_| "game data already loaded".to_string())
 }

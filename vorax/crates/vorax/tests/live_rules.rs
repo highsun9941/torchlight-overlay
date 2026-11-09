@@ -1,8 +1,19 @@
 use vorax::{advisor::{self, ScreenState}, bot::{self, Opt}, data::data, game, rng::Rng, types::*};
 
 #[test]
+fn live_simulations_use_measured_spawn_odds() {
+    let d = data();
+    assert_eq!(d.spawn_rarity, [50.0, 34.0, 12.0, 4.0]);
+    assert_eq!(d.start_four, Some(0.1));
+
+    let tanks_at_start = |seed| game::create_game(d.default_settings, None, Some(seed)).tanks.iter().flatten().count();
+    assert_eq!(tanks_at_start(1), 3);
+    assert_eq!(tanks_at_start(7), 4);
+}
+
+#[test]
 fn observed_transitions_from_two_live_runs_are_possible() {
-    // These seeds are witnesses for the observed outcomes, not the game's unknown RNG seed.
+    // These simulator seeds demonstrate that the recorded outcomes are possible under the live odds.
     // One contradictory race reading is documented separately, never silently corrected here.
     let rows:Vec<serde_json::Value>=serde_json::from_str(include_str!("../../../fixtures/live-transitions-20261101.json")).unwrap();
     assert_eq!(rows.len(),33);

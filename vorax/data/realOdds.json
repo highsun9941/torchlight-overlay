@@ -1,0 +1,10 @@
+{
+ "measured": "2026-11-04",
+ "spawnRarity": {
+  "normal": 50,
+  "magic": 34,
+  "rare": 12,
+  "boss": 4
+ },
+ "startFour": 0.1
+}

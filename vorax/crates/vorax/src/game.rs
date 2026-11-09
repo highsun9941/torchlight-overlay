@@ -354,7 +354,10 @@ pub fn play(s: &GameState, actions: &[Action]) -> GameState {
 
 fn random_start(d: &Data, rng: &mut Rng) -> Tanks {
     let mut tanks: Tanks = [None; TANK_COUNT];
-    let n = 3 + rng.int(2);
+    let n = match d.start_four {
+        Some(p) => 3 + usize::from(rng.chance(p)),
+        None => 3 + rng.int(2),
+    };
     for t in tanks.iter_mut().take(n) {
         let a = roll_archetype(rng);
         let r = roll_rarity(d, rng);
