@@ -407,6 +407,11 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
             }
             let heading = read_text(&if header=="instrument" {gold_heading(img,c,l.k,false).0} else {heading_crop(img,c,l.k)});
             if phases.iter().any(|phase| title_settled(data,phase,&heading,gold_first)) { return heading; }
+            if header == "protocol" {
+                // A dim surgical plan can lose strokes in the default heading mask.
+                let other = read_text(&gold_heading(img, c, l.k, false).0);
+                if title_settled(data, header, &other, true) { return other; }
+            }
             if phases.iter().any(|phase|ranked(data,phase,&heading).first().is_some_and(|r|crate::family::is_variant(&r.0) && r.1>=MIN_Q)) {
                 let block=read_text(&family_crop(img,c,l.k));let joined=format!("{heading}\n{block}");
                 if phases.iter().any(|phase|title_settled(data,phase,&joined,true)) {return joined;}
@@ -526,4 +531,23 @@ pub fn read_titles_styled_known(img: &Img, reading: Reading, data: &ScanData, re
         }
     }
     Reading { state, fields, problems, hand_ranks: Some((0..pos.len()).map(|j| pics.get(&j).map(|p| p.ranks.clone()).unwrap_or_default()).collect()), hand_pending: None, ..reading }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reported_korean_surgical_plans_settle_from_the_recorded_headings() {
+        let data = crate::scan_data();
+        assert!(!title_settled(data, "protocol", "심피소생소", true));
+        for (heading, expected) in [
+            (".ii\n표피이식 실험", "Epidermal Graft Experiment"),
+            ("심폐소생술", "Cardiopulmonary Resuscitation"),
+        ] {
+            assert!(title_settled(data, "protocol", heading, true));
+            assert_eq!(title_ranks(data, "protocol", heading, true)[0].0, expected);
+            assert!(!title_settled(data, "potion", heading, true));
+        }
+    }
 }

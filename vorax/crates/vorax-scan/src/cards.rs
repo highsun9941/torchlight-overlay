@@ -158,6 +158,19 @@ pub fn rank_card_art(img: &Img, c: &CardPos, k: f64, phase: &str, data: &ScanDat
     rank(img, c, k, &format!("{phase}:"), data, false)
 }
 
+/// Enlarged tooltips can draw the illustration at a smaller scale relative to the card frame.
+pub(crate) fn smaller_popup_art_score(img: &Img, c: &CardPos, k: f64, phase: &str, name: &str, data: &ScanData) -> f64 {
+    let Some(templates) = data.cards.get(&format!("{phase}:{name}")) else { return 0.0; };
+    let mut best = 0.0_f64;
+    for (dx, dy) in fine() {
+        let sample = card_art(img, c, k * 0.9, dx, dy);
+        for template in templates {
+            best = best.max(similarity(template, &sample));
+        }
+    }
+    best
+}
+
 pub struct SlotsRead {
     pub names: Vec<String>,
     pub fields: Fields,
