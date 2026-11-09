@@ -396,6 +396,7 @@ public partial class ControlWindow : Window
     private int? _rerolls;
     // The last counter read: in which run, how many it showed, and the Re-rolls the log had seen clicked by then.
     private (LoggedRun Run, int Left, int Used)? _rerollsRead;
+    private readonly RerolledCards _rerolledCards = new();
     // The last Sandbox read before the Consume target pick's red screen.
     private Vision.Ocr.ScreenText? _textBeforeRed;
 
@@ -895,6 +896,12 @@ public partial class ControlWindow : Window
                 // (its dim text doesn't read on every frame), else none: a run may have no Re-roll at all (Cage Fight).
                 if (pick.Kind == PickRead.Instrument)
                 {
+                    if (_rerolledCards.StillGoing(_logRun, pick, DateTime.Now))
+                    {
+                        _hints.Clear();
+                        ClearHint();
+                        return;
+                    }
                     if (pick.Rerolls is int read && _logRun != null) _rerollsRead = (_logRun, read, _logRun.RerollsUsed);
                     _rerolls = pick.Rerolls ?? (_rerollsRead is { } seen && seen.Run == _logRun ? Math.Max(0, seen.Left - (seen.Run.RerollsUsed - seen.Used)) : 0);
                 }

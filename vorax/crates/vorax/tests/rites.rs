@@ -29,6 +29,26 @@ fn a_rite_is_always_the_advice() {
 fn purest_holy_water_is_simulated() {
     linear_board_value();
     assert!(!advisor::is_always_take("Purest Holy Water"));
+    assert!(!advisor::is_always_take("The Holiest Water"));
+    assert_eq!(vorax::data().potion_by_name("The Holiest Water"), Some(39));
+    assert_eq!(vorax::data().potion_by_name("Fast-Acting Cardiac Stimulant"), Some(36));
     assert!(advisor::is_always_take("Ritual Holy Water: Flagellation"));
     assert!(advisor::is_always_take("Xenopanacea: Brood"));
+}
+
+#[test]
+fn a_dissection_is_the_advice_when_present_in_the_input() {
+    linear_board_value();
+    for title in [
+        "Dissection Infusion: Morbid Corpse",
+        "Dissection I: Vermectomy",
+        "Dissection II: Daemonectomy",
+        "Dissection III: Craniotomy",
+        "Dissection Infusion: Intact Skeleton",
+    ] {
+        let screen = board(&["Mutagenic Powder", "Bewitching Tincture", "Xeno-Hormone", title]);
+        let advice = advisor::advise_plan(&screen, Some(2), false);
+        assert!(matches!(&advice.best, Best::Card(r) if r.index == 3), "{title}: {:?}", advice.best);
+        assert!(advice.unknown.is_empty());
+    }
 }

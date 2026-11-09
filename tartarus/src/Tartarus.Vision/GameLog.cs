@@ -29,6 +29,8 @@ public sealed class LoggedRun
     public bool FromStart { get; set; }
     /// <summary>Instrument Re-rolls clicked.</summary>
     public int RerollsUsed { get; set; }
+    /// <summary>When the last instrument Re-roll was clicked, in local time.</summary>
+    public DateTime? LastRerollAt { get; set; }
     /// <summary>The Consume target pick (the red screen) is open: from its sound until Cancel or the day's end.</summary>
     public bool ConsumePick { get; set; }
     /// <summary>When the Sandbox last changed as far as the log tells (a bite, a Chromatic, a Prison Incident), local time.</summary>
@@ -198,7 +200,8 @@ public sealed partial class GameLog
         if (run == null) return false;
         if (line.Contains("AudioEnum  == UI_S16_Eating_red_screen", StringComparison.Ordinal)) run.ConsumePick = true;
         else if (line.Contains("AudioEnum  == UI_S16_Click_Cancel", StringComparison.Ordinal) || line.Contains("] S16BoardNewDayPop Run", StringComparison.Ordinal)) run.ConsumePick = false;
-        else if (line.Contains("normal-click Btn_S16Board_RelicPop_Reroll", StringComparison.Ordinal)) run.RerollsUsed++;
+        else if (line.Contains("normal-click Btn_S16Board_RelicPop_Reroll", StringComparison.Ordinal))
+            (run.LastRerollAt, run.RerollsUsed) = (LocalTime(line), run.RerollsUsed + 1);
         // A Chromatic: its sound as it reaches the rarity, one each (the flight to the panel after it plays once for two
         // that come at once), and its panel slot lighting up. The flight's sound is no change of its own: the cell is
         // often empty by then, and a reading after it like those before looked like the old Sandbox still on screen

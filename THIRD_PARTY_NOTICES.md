@@ -2,8 +2,8 @@
 
 - Korean helper integration: kinam-ssafy/torchlight-overlay, MIT, based on ddac4bfce7fe7551351d5cac7d8ef35096b2100d. Original notices and licences are retained.
 
-- TartarusSolver, glcoder, MIT. Based on v0.7.20 (9e19dda), with rules and solver updates from v0.7.41 (e3abd83). https://github.com/glcoder/TartarusSolver
-- Vorax Solver Rust, DinoRaos and original contributors including tidewarden and Moebing, MIT. Based on 9aabc20. https://github.com/DinoRaos/vorax-solver-rs
+- TartarusSolver, glcoder, MIT. Based on v0.7.20 (9e19dda), with rules and solver updates from v0.7.41 (e3abd83) and re-roll hint handling from v0.8.1 (2cde9d7). https://github.com/glcoder/TartarusSolver
+- Vorax Solver Rust, DinoRaos and original contributors including tidewarden and Moebing, MIT. Based on 9aabc20, with measured spawn odds and Dissection advice from v0.3.0 (5251461). https://github.com/DinoRaos/vorax-solver-rs
 - Vorax live rules, planning, and transition fixtures from kinam-ssafy/torchlight-overlay v1.0.9 (f0538a5), MIT. https://github.com/kinam-ssafy/torchlight-overlay/tree/v1.0.9
 - The original MIT notices are included under `licenses/` and in each source tree. No source from tidewarden after MIT commit 7b4c9ba is incorporated.
 - .NET and WPF: Microsoft, MIT. https://github.com/dotnet/runtime and https://github.com/dotnet/wpf

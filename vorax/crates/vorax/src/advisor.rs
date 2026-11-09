@@ -135,11 +135,11 @@ pub fn is_xenopanacea(name: &str) -> bool {
     name.trim().to_lowercase().starts_with("xenopanacea")
 }
 
-/// A Supreme potion the simulator can't play out, always the advice when offered: a Xenopanacea (its card prints
-/// only flavour text) or a Holy Water rite ("… Holy Water: …", whose effect is another card later; Purest Holy
-/// Water, with no colon, is simulated).
+/// Xenopanaceas, Holy Water rites, and the Dissection chain are always advised when offered.
+/// Their effects extend beyond the current offer, outside the simulated futures.
 pub fn is_always_take(name: &str) -> bool {
-    is_xenopanacea(name) || name.to_lowercase().contains("holy water:")
+    let title = name.trim().to_lowercase();
+    is_xenopanacea(&title) || title.contains("holy water:") || title.starts_with("dissection")
 }
 
 fn lookup(phase_potion: bool, name: &str) -> Option<u8> {
@@ -229,7 +229,7 @@ pub enum Prepared {
     Work { work: Work, x: ScreenState, unknown: Vec<String>, t0: Instant },
 }
 
-/// The advice that needs no futures (a protocol, a Xenopanacea or Holy Water rite), or the futures to play for it.
+/// Immediate advice for a protocol or special potion, or the futures to play for other choices.
 pub fn prepare(x: &ScreenState, futures: Option<u32>) -> Prepared {
     prepare_for_goal(x, futures, Goal::Target)
 }
@@ -241,11 +241,9 @@ pub fn prepare_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal) -> Pr
     if x.phase == ScreenPhase::Protocol {
         return Prepared::Done(Advice { goal, best: Best::Nothing, ranking: vec![], board: 0, refresh_end: None, plan: false, final_: true, ms: 0, unknown, note: None });
     }
-    // a ULT the simulator can't play out (a Xenopanacea, a Holy Water rite) is always taken: it's worth more than
-    // anything beside it
     if x.phase == ScreenPhase::Potion {
-        if let Some(xeno) = x.hand.iter().position(|n| is_always_take(n)) {
-            let pick = Ranked { index: xeno, targets: vec![], value: 0.0, end: None, no_effect: None };
+        if let Some(index) = x.hand.iter().position(|n| is_always_take(n)) {
+            let pick = Ranked { index, targets: vec![], value: 0.0, end: None, no_effect: None };
             let board = ultimate_activity(&to_state(&ScreenState { hand: vec![], ..x.clone() }, &mut Vec::new()));
             return Prepared::Done(Advice {
                 goal,
@@ -257,7 +255,7 @@ pub fn prepare_for_goal(x: &ScreenState, futures: Option<u32>, goal: Goal) -> Pr
                 final_: true,
                 ms: t0.elapsed().as_millis() as u64,
                 unknown,
-                note: Some(if is_xenopanacea(&x.hand[xeno]) { "A Xenopanacea: always take it when it’s offered.".into() } else { format!("{}: always take it when it’s offered.", x.hand[xeno]) }),
+                note: Some(if is_xenopanacea(&x.hand[index]) { "A Xenopanacea: always take it when it’s offered.".into() } else { format!("{}: always take it when it’s offered.", x.hand[index]) }),
             });
         }
     }
