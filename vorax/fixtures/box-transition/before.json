@@ -1,0 +1,143 @@
+{
+  "state": {
+    "tanks": [
+      {
+        "archetype": "pest",
+        "rarity": "magic",
+        "activity": 5,
+        "quantity": 24
+      },
+      {
+        "archetype": "agito",
+        "rarity": "normal",
+        "activity": 1,
+        "quantity": 36
+      },
+      {
+        "archetype": "pest",
+        "rarity": "normal",
+        "activity": 1,
+        "quantity": 36
+      },
+      null,
+      null,
+      null
+    ],
+    "hand": [
+      "Leptomeningeal Solution",
+      "Pure Leech Solution",
+      "Rare Potion Kit (Small)"
+    ],
+    "instruments": [
+      "Chrysalis Specimen"
+    ],
+    "instrumentRounds": [
+      1
+    ],
+    "phase": "potion",
+    "round": 1,
+    "potionRefreshes": 3,
+    "instrumentRefreshes": 0,
+    "shelley": 0
+  },
+  "fields": {
+    "phase": {
+      "sure": false,
+      "guess": "potion"
+    },
+    "tank0.rarity": {
+      "sure": true,
+      "guess": "magic"
+    },
+    "tank0.archetype": {
+      "sure": true,
+      "guess": "pest"
+    },
+    "tank0.activity": {
+      "sure": true,
+      "guess": "5"
+    },
+    "tank0.quantity": {
+      "sure": true,
+      "guess": "24"
+    },
+    "tank1.rarity": {
+      "sure": true,
+      "guess": "normal"
+    },
+    "tank1.archetype": {
+      "sure": true,
+      "guess": "agito"
+    },
+    "tank1.activity": {
+      "sure": true,
+      "guess": "1"
+    },
+    "tank1.quantity": {
+      "sure": true,
+      "guess": "36"
+    },
+    "tank2.rarity": {
+      "sure": true,
+      "guess": "normal"
+    },
+    "tank2.archetype": {
+      "sure": true,
+      "guess": "pest"
+    },
+    "tank2.activity": {
+      "sure": true,
+      "guess": "1"
+    },
+    "tank2.quantity": {
+      "sure": true,
+      "guess": "36"
+    },
+    "tank3.empty": {
+      "sure": true
+    },
+    "tank4.empty": {
+      "sure": true
+    },
+    "tank5.empty": {
+      "sure": true
+    },
+    "round": {
+      "sure": true,
+      "guess": "1"
+    },
+    "refreshes": {
+      "sure": true,
+      "guess": "3"
+    },
+    "instrument0": {
+      "sure": true,
+      "guess": "Chrysalis Specimen"
+    },
+    "hand0": {
+      "sure": true,
+      "guess": "Leptomeningeal Solution",
+      "score": 10.0
+    },
+    "hand1": {
+      "sure": true,
+      "guess": "Pure Leech Solution",
+      "score": 10.0
+    },
+    "hand2": {
+      "sure": true,
+      "guess": "Rare Potion Kit (Small)",
+      "score": 10.0
+    }
+  },
+  "problems": [],
+  "frame": {
+    "width": 2048,
+    "height": 883
+  },
+  "handRanks": [
+    [],
+    [],
+    []
+  ]
+}

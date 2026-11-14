@@ -140,8 +140,13 @@ impl Pipeline {
     pub fn hover_dirty(&self) -> bool { self.zoom_dirty }
     pub fn cancel_hover_candidate(&mut self) { self.zoom_candidate=None; self.tank_candidate=None; }
     pub fn reset_hover(&mut self) {
-        self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.cancel_hover_candidate(); self.zoom_dirty=false;
         self.memory.clear();
+        self.recheck_hand();
+    }
+    /// Re-read an offer's titles while retaining independently verified board values.
+    pub fn recheck_hand(&mut self) {
+        self.pending=None; self.zoom_names.clear(); self.zoom_board.clear(); self.cancel_hover_candidate(); self.zoom_dirty=false;
+        self.memory.forget_hand();
     }
     pub fn memory_status(&self) -> serde_json::Value { serde_json::json!({"revision":self.memory.revision,"round":self.memory.round(),"confirmed":self.memory.confirmed(),"reused":self.memory.reused,"transitionCheck":self.memory.suspended}) }
     pub fn progress(&self) -> String {
@@ -297,6 +302,7 @@ impl Pipeline {
         let t = std::time::Instant::now();
         let prior_round=self.memory.round().or_else(||self.last.as_ref().and_then(|(r,..)|r.state.round));
         if matches!(trigger,Some("board" | "refresh" | "screen")) {self.reset_hover();}
+        if matches!(trigger, Some("offer" | "manual")) { self.recheck_hand(); }
         self.invalidate();
         self.resumed = false;
         let data = scan_data();
@@ -525,6 +531,47 @@ mod tests {
         next.round = Some(2);
         carry_open_box(&rerolled, &mut next);
         assert_eq!(next.open_box, None);
+    }
+
+    #[test]
+    fn an_opened_small_kit_replaces_cached_names_on_offer_and_manual_scans() {
+        use super::*;
+        if !production_korean_case("an_opened_small_kit_replaces_cached_names_on_offer_and_manual_scans") { return; }
+        let frame = decode_png(&std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/box-transition/opened.png")).unwrap();
+        let expected = ["Leptomeningeal Solution", "Pure Leech Solution", "Gray Matter Spinal Solution"];
+        for trigger in ["offer", "manual"] {
+            let mut pipe = Pipeline::new(0);
+            let mut previous: Reading = serde_json::from_str(include_str!("../../../fixtures/box-transition/before.json")).unwrap();
+            pipe.tracker = track_instruments(&pipe.tracker, &previous, None).tracker;
+            pipe.apply_zoom(&mut previous);
+            pipe.zoom_names.insert(2, "Rare Potion Kit (Small)".into());
+            pipe.last = Some((previous.clone(), frame.width, frame.height));
+            let mut headings = ["연수막 용액", "순수 거머리 용액", "회백질 척수 용액"].into_iter();
+            let mut calls = 0;
+            let mut read = |_: &Img| {
+                calls += 1;
+                headings.next().unwrap_or("").to_owned()
+            };
+            let outcome = pipe.run(&frame, Some(trigger), Some(&mut read));
+            assert!(calls > 0, "{trigger} must check the replacement instead of reusing the kit");
+            match outcome {
+                Outcome::Advice { reading, plan, .. } => {
+                    assert_eq!(reading.state.hand, expected, "{trigger}");
+                    assert_eq!(reading.state.round, Some(1));
+                    assert_eq!(reading.state.potion_refreshes, Some(3));
+                    assert_eq!(reading.state.open_box.as_deref(), Some("Rare Potion Kit (Small)"));
+                    assert!(!plan.pill.unwrap().main.contains("포션 상자"));
+                }
+                Outcome::Uncertain { reading } => panic!("{trigger}: {}", serde_json::to_string(&reading).unwrap()),
+                _ => panic!("{trigger} must read the opened offer"),
+            }
+            let mut no_repeat = |_: &Img| -> String { panic!("the replacement is already confirmed") };
+            let Outcome::Advice { reading, .. } = pipe.run(&frame, None, Some(&mut no_repeat)) else {
+                panic!("the confirmed replacement must remain usable");
+            };
+            assert_eq!(reading.state.hand, expected);
+        }
     }
 
     fn round_ten(file:&str)->super::Img {

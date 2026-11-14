@@ -180,6 +180,7 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
         let relook = relook_at.is_some_and(|t| Instant::now() >= t);
         let again = retry.filter(|(t, _)| Instant::now() >= *t);
         let mut visual = false;
+        let mut hand_changed = false;
         if last_visual_poll.elapsed() >= VISUAL_POLL && !manual && due.is_none() && !relook && again.is_none() {
             last_visual_poll = Instant::now();
             if let Some(game) = find_game_window() {
@@ -286,7 +287,10 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
                             status("화면 변경 감지", "화면이 안정되면 자동으로 다시 읽습니다.", "이전 추천 숨김");
                             send(ToUi::Clear);
                         }
-                        Change::Ready => visual = true,
+                        Change::Ready => {
+                            visual = true;
+                            hand_changed = watch.compare(&frame, pipe.ui()).iter().any(|d| d.area.starts_with("hand"));
+                        }
                         _ => {}
                         }
                         if inspecting && !visual {continue;}
@@ -312,6 +316,8 @@ pub fn run(opts: Options, tx: Sender<ToUi>, waker: Waker, rx: Receiver<ToWorker>
             let trigger = match due {
                 Some(Trigger::Screen) => Some("screen"),
                 Some(kind) => Some(kind.name()),
+                None if manual => Some("manual"),
+                None if hand_changed => Some("offer"),
                 None if visual => Some("visual"),
                 None => again.and_then(|(_, t)| t),
             };
@@ -416,6 +422,7 @@ fn read(capturer: &Capturer, ocr: Option<&Ocr>, pipe: &mut Pipeline, watch: &mut
                 let diff=watch.compare(&latest,pipe.ui());
                 if !diff.is_empty() {
                     pipe.invalidate();
+                    if diff.iter().any(|d| d.area.starts_with("hand")) { pipe.recheck_hand(); }
                     diagnostics::event(scan_id,"freshness_rejected",serde_json::json!({"areas":diff,"recognized":reading.map(|r|&r.state),"before":[frame.width,frame.height],"after":[latest.width,latest.height]}));
                     diagnostics::save(scan_id,"freshness_rejected",&frame,Some(&latest),reading,&ocr_attempts,&crops,serde_json::json!({"areas":diff}));
                     status("화면 변경 감지","분석 중 카드나 수치가 바뀌어 다시 읽습니다.","이전 추천 숨김");send(ToUi::Clear);

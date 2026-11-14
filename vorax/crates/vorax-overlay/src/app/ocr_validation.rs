@@ -121,8 +121,37 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
         if !ok {failed.push(format!("{file}/native-{native}"));}
         rare_cases.push(json!({"file":file,"native":native,"passed":ok,"result":read,"association":association,"confirmed":confirmed,"remainingTanks":pipe.requested_tanks(),"requestedCards":pipe.requested_slots()}));
     }
+    let opened = load(root, "box-transition/opened.png")?;
+    let previous: vorax_scan::reading::Reading = serde_json::from_slice(
+        &std::fs::read(root.join("box-transition/before.json")).map_err(|e| e.to_string())?
+    ).map_err(|e| e.to_string())?;
+    let mut box_cases = Vec::new();
+    for trigger in ["offer", "manual"] {
+        let mut pipe = crate::pipeline::Pipeline::new(0);
+        let mut prior = previous.clone();
+        pipe.apply_zoom(&mut prior);
+        let start = attempts.len();
+        let mut reader = |img: &Img| {
+            let name = format!("crop-{index:03}.png"); index += 1;
+            let _ = crate::pipeline::encode_png(&out.join(&name), img.width as u32, img.height as u32, &img.data);
+            let result = ocr.read(img);
+            attempts.push(json!({"file":"box-transition/opened.png","trigger":trigger,"crop":name,"width":img.width,"height":img.height,
+                "text":result.as_ref().ok(),"error":result.as_ref().err().map(|e|e.to_string()),"model":ocr.details()}));
+            result.unwrap_or_default()
+        };
+        let result = pipe.run(&opened, Some(trigger), Some(&mut reader));
+        let (advice, reading) = match result {
+            crate::pipeline::Outcome::Advice { reading, .. } => (true, Some(reading)),
+            crate::pipeline::Outcome::Uncertain { reading } => (false, Some(reading)),
+            _ => (false, None),
+        };
+        let passed = advice && attempts.len() > start && reading.as_ref().is_some_and(|r|
+            r.state.hand == ["Leptomeningeal Solution", "Pure Leech Solution", "Gray Matter Spinal Solution"]);
+        if !passed { failed.push(format!("box-transition/{trigger}")); }
+        box_cases.push(json!({"trigger":trigger,"passed":passed,"ocrCalls":attempts.len()-start,"reading":reading}));
+    }
     let report=json!({"backend":ocr.backend,"model":ocr.details(),"cases":cases,"attempts":attempts,
-        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"rareTankCases":rare_cases,"failures":failed});
+        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"rareTankCases":rare_cases,"boxCases":box_cases,"failures":failed});
     std::fs::write(out.join("model-validation.json"),serde_json::to_vec_pretty(&report).unwrap()).map_err(|e|e.to_string())?;
     println!("PADDLE_VALIDATION {}",serde_json::to_string(&report).unwrap());
     if failed.is_empty() {Ok(())} else {Err(format!("PaddleOCR validation failed: {}",failed.join(", ")))}
