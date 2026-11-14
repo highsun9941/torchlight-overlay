@@ -150,8 +150,35 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
         if !passed { failed.push(format!("box-transition/{trigger}")); }
         box_cases.push(json!({"trigger":trigger,"passed":passed,"ocrCalls":attempts.len()-start,"reading":reading}));
     }
+    let mut holy_water_cases = Vec::new();
+    for file in ["holy-water/wide.png", "holy-water/narrow.png"] {
+        let frame = load(root, file)?;
+        for trigger in ["offer", "manual"] {
+            let mut pipe = crate::pipeline::Pipeline::new(0);
+            let start = attempts.len();
+            let mut reader = |img: &Img| {
+                let name = format!("crop-{index:03}.png"); index += 1;
+                let _ = crate::pipeline::encode_png(&out.join(&name), img.width as u32, img.height as u32, &img.data);
+                let result = ocr.read(img);
+                attempts.push(json!({"file":file,"trigger":trigger,"crop":name,"width":img.width,"height":img.height,
+                    "text":result.as_ref().ok(),"error":result.as_ref().err().map(|e|e.to_string()),"model":ocr.details()}));
+                result.unwrap_or_default()
+            };
+            let result = pipe.run(&frame, Some(trigger), Some(&mut reader));
+            let (advice, reading) = match result {
+                crate::pipeline::Outcome::Advice { reading, .. } => (true, Some(reading)),
+                crate::pipeline::Outcome::Uncertain { reading } => (false, Some(reading)),
+                _ => (false, None),
+            };
+            let passed = advice && attempts.len() > start && pipe.requested_slots().is_empty()
+                && reading.as_ref().is_some_and(|r| r.fields["hand0"].sure
+                    && r.state.hand == ["Purest Holy Water", "Eggshell Powder", "Twin Hormone - Bone Sentry"]);
+            if !passed { failed.push(format!("{file}/{trigger}")); }
+            holy_water_cases.push(json!({"file":file,"trigger":trigger,"passed":passed,"ocrCalls":attempts.len()-start,"reading":reading}));
+        }
+    }
     let report=json!({"backend":ocr.backend,"model":ocr.details(),"cases":cases,"attempts":attempts,
-        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"rareTankCases":rare_cases,"boxCases":box_cases,"failures":failed});
+        "sawPipeline":{"passed":passed,"direct":direct,"requestedBefore":before,"reading":reading},"tankPipeline":tank_report,"rareTankCases":rare_cases,"boxCases":box_cases,"holyWaterCases":holy_water_cases,"failures":failed});
     std::fs::write(out.join("model-validation.json"),serde_json::to_vec_pretty(&report).unwrap()).map_err(|e|e.to_string())?;
     println!("PADDLE_VALIDATION {}",serde_json::to_string(&report).unwrap());
     if failed.is_empty() {Ok(())} else {Err(format!("PaddleOCR validation failed: {}",failed.join(", ")))}

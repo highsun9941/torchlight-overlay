@@ -538,6 +538,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn reported_purest_holy_water_headings_resolve_to_the_existing_potion() {
+        let data = crate::scan_data();
+        for text in [
+            "순수한 성수",
+            "순수한성수",
+            "순수한성수\n모든 각성체를2\n티어놓은 히귀도의",
+        ] {
+            assert!(title_settled(data, "potion", text, true), "{text}");
+            assert_eq!(title_ranks(data, "potion", text, true)[0].0, "Purest Holy Water");
+            assert!(!title_settled(data, "instrument", text, true));
+        }
+        for text in ["순수한", "성수", "잘못된 화면"] {
+            assert!(name_fit("Purest Holy Water", text) < MIN_Q, "{text}");
+        }
+        assert_eq!(title_ranks(data, "potion", "순수 거머리 용액", true)[0].0, "Pure Leech Solution");
+        assert_eq!(title_ranks(data, "potion", "제1의식 성수: 고해", true)[0].0, "First Rite Holy Water: Confession");
+        assert_eq!(title_ranks(data, "potion", "제2의식 성수: 태형", true)[0].0, "Ritual Holy Water: Flagellation");
+    }
+
+    #[test]
     fn reported_korean_surgical_plans_settle_from_the_recorded_headings() {
         let data = crate::scan_data();
         assert!(!title_settled(data, "protocol", "심피소생소", true));
