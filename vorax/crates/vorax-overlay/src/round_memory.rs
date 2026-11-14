@@ -59,6 +59,25 @@ mod tests {
         memory.remember(&next);assert_eq!(memory.round(),Some(8));
         let mut same=partial();memory.restore(&mut same);assert!(!memory.suspended);assert!(sure(&same,"round"));assert_eq!(same.state.round,Some(8));
     }
+
+    #[test]
+    fn replacing_the_hand_preserves_board_values_and_rechecks_every_card() {
+        let mut memory = RoundMemory::default();
+        let before = round_known();
+        memory.remember(&before);
+        memory.forget_hand();
+        assert!(memory.names().is_empty());
+        assert_eq!(memory.revision, 1);
+        let mut current = partial();
+        current.state.tanks[0] = None;
+        current.fields.get_mut("tank0.activity").unwrap().sure = false;
+        for i in 0..3 { current.fields.get_mut(&format!("hand{i}")).unwrap().sure = false; }
+        memory.restore(&mut current);
+        assert_eq!(current.state.round, Some(8));
+        assert_eq!(tank_value(&current, 0), tank_value(&before, 0));
+        assert!((0..3).all(|i| !sure(&current, &format!("hand{i}"))));
+        assert!(!memory.reused.iter().any(|field| field.starts_with("hand")));
+    }
 }
 
 fn sure(r: &Reading, field: &str) -> bool { r.fields.get(field).is_some_and(|f| f.sure) }
@@ -75,6 +94,15 @@ fn refreshes(r: &Reading) -> Option<i32> {
 
 impl RoundMemory {
     pub fn clear(&mut self) { self.saved = None; self.reused.clear(); self.suspended=false; self.revision += 1; }
+    /// A kit or same-round reroll can replace every title without changing the board.
+    pub fn forget_hand(&mut self) {
+        if let Some(saved) = &mut self.saved {
+            saved.fields.retain(|field, _| !field.starts_with("hand"));
+            saved.state.hand.clear();
+            self.reused.clear();
+            self.revision += 1;
+        }
+    }
     pub fn round(&self) -> Option<i32> { self.saved.as_ref().filter(|r| sure(r,"round")).and_then(|r| r.state.round) }
     pub fn names(&self) -> BTreeMap<usize, String> {
         if self.suspended {return BTreeMap::new();}
