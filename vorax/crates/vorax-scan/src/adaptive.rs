@@ -70,8 +70,10 @@ fn round_refs(data: &ScanData) -> &'static IndexMap<String, Vec<Vec<f64>>> {
 pub fn round(img: &Img, g: &[f32], l: &Layout, data: &ScanData) -> Option<TextRead> {
     let first = read_text(img, g, &l.round, TextKind::Round, &data.digits["round"]);
     if first.as_ref().is_some_and(|r| valid_round(r, 0.75)) { return first; }
-    for dy in [0.0, -2.0 * l.k, 2.0 * l.k, -4.0 * l.k, 4.0 * l.k] {
-        if let Some(read) = read_text(img, g, &shifted(l.round, dy), TextKind::Round, round_refs(data)) {
+    // Resized captures can leave the Korean heading in the top of this band. A few
+    // more pixels of movement isolate the numeral without leaving the counter panel.
+    for dy in [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0, -8.0, 8.0] {
+        if let Some(read) = read_text(img, g, &shifted(l.round, dy * l.k), TextKind::Round, round_refs(data)) {
             if valid_round(&read, 0.80) && read.score - read.second >= 0.06 { return Some(read); }
         }
     }

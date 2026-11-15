@@ -545,8 +545,9 @@ mod tests {
                 let mut headings = ["순수한 성수", "난각 가루약", "쌍둥이호르몬-해골 경비병"].into_iter();
                 let mut title_calls = 0;
                 let mut reader = |img: &Img| {
-                    // Upload resizing can also require the independent round OCR fallback.
-                    if img.height < 120 { return "3/13".to_owned(); }
+                    // The actual CPU model read the misplaced round crop as this label.
+                    // A synthetic "3/13" here hid the failure on the wide screenshot.
+                    if img.height < 120 { return "다룬뉴".to_owned(); }
                     title_calls += 1;
                     assert_eq!((img.width, img.height), (464, 120), "the recorded headings suffice");
                     headings.next().expect("one OCR call per offered card").to_owned()
@@ -555,6 +556,7 @@ mod tests {
                     Outcome::Advice { reading, .. } => {
                         assert_eq!(reading.state.hand, ["Purest Holy Water", "Eggshell Powder", "Twin Hormone - Bone Sentry"], "{file}/{trigger}");
                         assert_eq!(reading.state.round, Some(3));
+                        assert!(reading.fields["round"].sure);
                         assert_eq!(reading.state.potion_refreshes, Some(1));
                         assert!(reading.fields["hand0"].sure);
                         assert_eq!(data().potion_by_name(&reading.state.hand[0]), Some(39));
@@ -563,6 +565,47 @@ mod tests {
                     _ => panic!("{file}/{trigger}: the offer must be readable"),
                 }
                 assert_eq!(title_calls, 3, "{file}/{trigger}: no redundant title OCR fallback");
+                assert!(pipe.requested_slots().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn reported_holy_water_cpu_ocr_outputs_reach_advice_with_a_verified_round() {
+        use super::*;
+        if !production_korean_case("reported_holy_water_cpu_ocr_outputs_reach_advice_with_a_verified_round") { return; }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/holy-water");
+        for file in ["wide.png", "narrow.png"] {
+            let frame = decode_png(&root.join(file)).unwrap();
+            // Actual card OCR output from failed Windows job 132539067413, including
+            // empty headings and noisy description fallbacks. No round is supplied.
+            let outputs = if file == "wide.png" {
+                [((464,120),"순수한 성수"), ((464,120),""), ((560,300),"'"),
+                    ((560,300),"2윤난각가루약의\n이레니랜던1그문몬스터]"), ((464,120),"쌍둥이호르몬-해골경비병")]
+            } else {
+                [((464,120),"순수한 성수"), ((464,120),"난각가루약"), ((464,120),"1"),
+                    ((560,300),""), ((560,300),"쌍등이호르몬해글경비명\n1그룹몬스터를 선택해")]
+            };
+            for trigger in ["offer", "manual"] {
+                let mut pipe = Pipeline::new(0);
+                let mut responses = outputs.iter();
+                let mut reader = |img: &Img| {
+                    if img.height < 120 { return "다룬뉴".to_owned(); }
+                    let (size, text) = responses.next().expect("only the recorded card OCR attempts");
+                    assert_eq!((img.width, img.height), *size);
+                    (*text).to_owned()
+                };
+                match pipe.run(&frame, Some(trigger), Some(&mut reader)) {
+                    Outcome::Advice { reading, .. } => {
+                        assert_eq!(reading.state.round, Some(3), "{file}/{trigger}");
+                        assert!(reading.fields["round"].sure);
+                        assert_eq!(reading.state.hand, ["Purest Holy Water", "Eggshell Powder", "Twin Hormone - Bone Sentry"]);
+                        assert!((0..3).all(|i| reading.fields[&format!("hand{i}")].sure));
+                    }
+                    Outcome::Uncertain { reading } => panic!("{file}/{trigger}: {}", serde_json::to_string(&reading).unwrap()),
+                    _ => panic!("{file}/{trigger}: the recorded CPU outputs must reach advice"),
+                }
+                assert!(responses.next().is_none(), "{file}/{trigger}: replay every recorded card OCR attempt");
                 assert!(pipe.requested_slots().is_empty());
             }
         }

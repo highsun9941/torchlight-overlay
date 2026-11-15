@@ -171,7 +171,8 @@ pub fn run(root:&Path,out:&Path)->Result<(),String> {
                 _ => (false, None),
             };
             let passed = advice && attempts.len() > start && pipe.requested_slots().is_empty()
-                && reading.as_ref().is_some_and(|r| r.fields["hand0"].sure
+                && reading.as_ref().is_some_and(|r| r.fields["hand0"].sure && r.fields["round"].sure
+                    && r.state.round == Some(3) && r.state.potion_refreshes == Some(1)
                     && r.state.hand == ["Purest Holy Water", "Eggshell Powder", "Twin Hormone - Bone Sentry"]);
             if !passed { failed.push(format!("{file}/{trigger}")); }
             holy_water_cases.push(json!({"file":file,"trigger":trigger,"passed":passed,"ocrCalls":attempts.len()-start,"reading":reading}));
